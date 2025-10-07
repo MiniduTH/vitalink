@@ -1,0 +1,203 @@
+/* Appointment Card - Mobile-First Design */
+
+.appointmentCard {
+    background: white;
+    border-radius: var(--radius-xl);
+    padding: var(--space-lg);
+    margin-bottom: var(--space-md);
+    box-shadow: var(--shadow-sm);
+    border-left: 4px solid var(--accent-teal);
+    transition: transform var(--transition-base), box-shadow var(--transition-base);
+    cursor: pointer;
+}
+
+.appointmentCard:active {
+    transform: scale(0.98);
+}
+
+/* Status-based left border colors */
+.scheduled {
+    border-left-color: var(--status-scheduled);
+}
+
+.confirmed {
+    border-left-color: var(--status-confirmed);
+}
+
+.checkedIn {
+    border-left-color: var(--status-checkedin);
+}
+
+.completed {
+    border-left-color: var(--status-completed);
+}
+
+.cancelled {
+    border-left-color: var(--status-cancelled);
+}
+
+/* Card Content */
+.cardContent {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+/* Header */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-md);
+}
+
+.patientName {
+    font-size: var(--text-lg);
+    font-weight: var(--font-semibold);
+    color: var(--text-dark);
+    margin: 0;
+    flex: 1;
+    line-height: var(--leading-tight);
+}
+
+.arrowButton {
+    background: none;
+    border: none;
+    font-size: 1.75rem;
+    color: var(--text-gray);
+    padding: 0;
+    cursor: pointer;
+    line-height: 1;
+    transition: color var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.arrowButton:hover {
+    color: var(--accent-teal);
+}
+
+/* Details */
+.details {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.doctor {
+    font-size: var(--text-sm);
+    color: var(--text-gray);
+    margin: 0;
+}
+
+.timeInfo {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: var(--text-sm);
+    color: var(--text-gray);
+}
+
+.time,
+.date {
+    font-weight: var(--font-medium);
+}
+
+.separator {
+    color: var(--border-light);
+}
+
+/* Actions */
+.actions {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-xs);
+    flex-wrap: wrap;
+}
+
+.btn {
+    padding: 0.625rem 1.25rem;
+    border-radius: var(--radius-md);
+    border: none;
+    font-weight: var(--font-medium);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    min-height: 44px;
+    flex: 1;
+    min-width: 120px;
+}
+
+.btnCheckIn {
+    background: var(--accent-teal);
+    color: white;
+}
+
+.btnCheckIn:hover {
+    background: #55c8d8;
+}
+
+.btnCheckIn:active {
+    transform: scale(0.97);
+}
+
+.btnReschedule {
+    background: var(--bg-light);
+    color: var(--text-dark);
+}
+
+.btnReschedule:hover {
+    background: var(--border-light);
+}
+
+.btnReschedule:active {
+    transform: scale(0.97);
+}
+
+.btnCancel {
+    background: var(--status-cancelled);
+    color: var(--text-dark);
+}
+
+.btnCancel:hover {
+    background: #ffcccc;
+}
+
+.btnCancel:active {
+    transform: scale(0.97);
+}
+
+/* Tablet: 768px+ */
+@media (min-width: 768px) {
+    .appointmentCard {
+        padding: var(--space-xl);
+    }
+
+    .patientName {
+        font-size: var(--text-xl);
+    }
+
+    .doctor,
+    .timeInfo {
+        font-size: var(--text-base);
+    }
+
+    .actions {
+        flex-wrap: nowrap;
+    }
+
+    .btn {
+        flex: 0 1 auto;
+    }
+}
+
+/* Desktop: 1024px+ */
+@media (min-width: 1024px) {
+    .appointmentCard:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+    }
+
+    .appointmentCard:active {
+        transform: translateY(-2px) scale(0.99);
+    }
+}
