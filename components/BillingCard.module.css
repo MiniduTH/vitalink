@@ -1,0 +1,225 @@
+/* Mobile-first responsive design */
+.card {
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    transition: box-shadow 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.dateTime {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.date {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
+.id {
+    font-size: 0.75rem;
+    color: #666;
+    font-family: monospace;
+}
+
+.badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.badgeSuccess {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.badgePending {
+    background: #fff3e0;
+    color: #f57c00;
+}
+
+.badgeDanger {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.badgeDefault {
+    background: #f5f5f5;
+    color: #666;
+}
+
+/* Amounts Section */
+.amounts {
+    background: #f9f9f9;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.amountRow {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.amountRow:last-child {
+    border-bottom: none;
+}
+
+.patientRow {
+    border-top: 2px solid #1976d2;
+    padding-top: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.amountLabel {
+    font-weight: 600;
+    color: #666;
+    font-size: 0.875rem;
+}
+
+.amountValue {
+    color: #1a1a1a;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.amountValue.insurance {
+    color: #43a047;
+}
+
+.amountValue.patient {
+    color: #1976d2;
+    font-size: 1rem;
+}
+
+/* Info Section */
+.info {
+    margin-bottom: 1rem;
+}
+
+.infoItem {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.infoItem:last-child {
+    border-bottom: none;
+}
+
+.label {
+    font-weight: 600;
+    color: #666;
+    font-size: 0.875rem;
+}
+
+.value {
+    color: #1a1a1a;
+    font-size: 0.875rem;
+    text-align: right;
+    word-break: break-word;
+    max-width: 60%;
+}
+
+/* Actions */
+.actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.btn {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btnPrimary {
+    background: #1976d2;
+    color: white;
+}
+
+.btnPrimary:hover {
+    background: #1565c0;
+}
+
+.btnSecondary {
+    background: #f5f5f5;
+    color: #1a1a1a;
+}
+
+.btnSecondary:hover {
+    background: #e0e0e0;
+}
+
+/* Tablet: 768px+ */
+@media (min-width: 768px) {
+    .card {
+        padding: 1.5rem;
+    }
+
+    .date {
+        font-size: 1rem;
+    }
+
+    .amountLabel,
+    .amountValue {
+        font-size: 1rem;
+    }
+
+    .amountValue.patient {
+        font-size: 1.125rem;
+    }
+
+    .label,
+    .value {
+        font-size: 1rem;
+    }
+
+    .btn {
+        font-size: 1rem;
+    }
+}
+
+/* Desktop: 1024px+ */
+@media (min-width: 1024px) {
+    .card {
+        padding: 2rem;
+    }
+
+    .actions {
+        gap: 1rem;
+    }
+
+    .btn {
+        flex: none;
+        padding: 0.75rem 1.5rem;
+    }
+}
