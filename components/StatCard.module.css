@@ -1,0 +1,98 @@
+/* Stat Card - Mobile-First Design */
+
+.statCard {
+    border-radius: var(--radius-xl);
+    padding: var(--space-lg);
+    text-align: center;
+    box-shadow: var(--shadow-sm);
+    transition: transform var(--transition-base), box-shadow var(--transition-base);
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+}
+
+.statCard:active {
+    transform: scale(0.98);
+}
+
+/* Color Variants */
+.pink {
+    background: var(--primary-pink);
+}
+
+.green {
+    background: var(--primary-green);
+}
+
+.blue {
+    background: var(--primary-blue);
+}
+
+.teal {
+    background: var(--accent-teal);
+    color: white;
+}
+
+/* Icon */
+.icon {
+    font-size: 2rem;
+    margin-bottom: var(--space-xs);
+}
+
+/* Content */
+.content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.value {
+    font-size: var(--text-3xl);
+    font-weight: var(--font-bold);
+    color: var(--text-dark);
+    margin: 0;
+    line-height: 1;
+}
+
+.teal .value {
+    color: white;
+}
+
+.label {
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+    color: var(--text-dark);
+    margin: 0;
+    opacity: 0.9;
+}
+
+.teal .label {
+    color: white;
+}
+
+/* Tablet: 768px+ */
+@media (min-width: 768px) {
+    .statCard {
+        padding: var(--space-xl);
+        min-height: 140px;
+    }
+
+    .value {
+        font-size: 2.5rem;
+    }
+
+    .label {
+        font-size: var(--text-base);
+    }
+}
+
+/* Desktop: 1024px+ */
+@media (min-width: 1024px) {
+    .statCard:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-lg);
+    }
+}
