@@ -1,9 +1,26 @@
-import { collection, doc, getDoc, getDocs, addDoc, query, where, Timestamp } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, addDoc, updateDoc, query, where, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import { InsurancePolicy, InsuranceClaim } from "@/lib/types";
 
 export class InsurancePolicyRepository {
     private collectionName = "insurancePolicies";
+
+    async create(data: Omit<InsurancePolicy, "id" | "createdAt" | "updatedAt">): Promise<string> {
+        const docRef = await addDoc(collection(db, this.collectionName), {
+            ...data,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+        });
+        return docRef.id;
+    }
+
+    async update(id: string, data: Partial<Omit<InsurancePolicy, "id" | "createdAt" | "updatedAt">>): Promise<void> {
+        const docRef = doc(db, this.collectionName, id);
+        await updateDoc(docRef, {
+            ...data,
+            updatedAt: Timestamp.now(),
+        });
+    }
 
     async findById(id: string): Promise<InsurancePolicy | null> {
         const docRef = doc(db, this.collectionName, id);

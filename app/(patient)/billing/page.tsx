@@ -4,110 +4,113 @@ import React, { useState, useEffect } from "react";
 import { StatCard } from "@/components/StatCard";
 import { SearchBar } from "@/components/SearchBar";
 import styles from "./billing.module.css";
+import { useAuth } from "@/lib/contexts/AuthContext";
+import { useRouter } from "next/navigation";
+import { PaymentRepository } from "@/lib/firestore/repositories/PaymentRepository";
+import { InsurancePolicyRepository, InsuranceClaimRepository } from "@/lib/firestore/repositories/InsuranceRepository";
+import { BillingService } from "@/lib/services/BillingService";
+import { InsuranceService } from "@/lib/services/InsuranceService";
+import { NotificationService } from "@/lib/services/NotificationService";
+import { Payment, InsurancePolicy } from "@/lib/types";
+import { Timestamp } from "firebase/firestore";
 
-interface Bill {
-    id: string;
-    date: string;
-    description: string;
-    amount: number;
-    status: "Paid" | "Pending" | "Overdue";
-    invoiceNumber: string;
-    dueDate: string;
-}
-
-interface Insurance {
-    policyNumber: string;
-    provider: string;
-    coverageType: string;
-    expiryDate: string;
-    status: "Active" | "Expired";
-}
-
-interface Payment {
-    id: string;
-    date: string;
-    amount: number;
-    method: string;
-    billId: string;
-    receiptNumber: string;
-}
+// Initialize services at module level
+const paymentRepo = new PaymentRepository();
+const insurancePolicyRepo = new InsurancePolicyRepository();
+const insuranceClaimRepo = new InsuranceClaimRepository();
+const notificationService = new NotificationService();
+const insuranceService = new InsuranceService(insurancePolicyRepo, insuranceClaimRepo, notificationService);
+const billingService = new BillingService(paymentRepo, insuranceService, notificationService);
 
 export default function PatientBilling() {
+    const { user, loading: authLoading, userData } = useAuth();
+    const router = useRouter();
+
     const [activeTab, setActiveTab] = useState<"bills" | "insurance" | "history">("bills");
-    const [bills, setBills] = useState<Bill[]>([]);
-    const [insurance, setInsurance] = useState<Insurance | null>(null);
+    const [bills, setBills] = useState<Payment[]>([]);
+    const [insurance, setInsurance] = useState<InsurancePolicy | null>(null);
     const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
     const [loading, setLoading] = useState(true);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
-    const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
+    const [showInsuranceModal, setShowInsuranceModal] = useState(false);
+    const [showUpdateInsuranceModal, setShowUpdateInsuranceModal] = useState(false);
+    const [showPolicyDetailsModal, setShowPolicyDetailsModal] = useState(false);
+    const [selectedBill, setSelectedBill] = useState<Payment | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [paymentForm, setPaymentForm] = useState({
+        paymentMethod: "",
+        cardNumber: "",
+        expiryDate: "",
+        cvv: "",
+    });
+    const [insuranceForm, setInsuranceForm] = useState({
+        policyNumber: "",
+        provider: "",
+        coveragePercentage: "",
+        maxCoverage: "",
+        startDate: "",
+        endDate: "",
+    });
 
     useEffect(() => {
-        // TODO: Replace with actual API calls
-        setTimeout(() => {
-            setBills([
-                {
-                    id: "bill-1",
-                    date: "2025-01-15",
-                    description: "General Consultation - Dr. Sarah Johnson",
-                    amount: 5000,
-                    status: "Pending",
-                    invoiceNumber: "INV-2025-001",
-                    dueDate: "2025-02-15",
-                },
-                {
-                    id: "bill-2",
-                    date: "2024-12-20",
-                    description: "Lab Tests - Complete Blood Count",
-                    amount: 3500,
-                    status: "Paid",
-                    invoiceNumber: "INV-2024-245",
-                    dueDate: "2025-01-20",
-                },
-                {
-                    id: "bill-3",
-                    date: "2024-11-10",
-                    description: "Cardiology Consultation",
-                    amount: 8000,
-                    status: "Paid",
-                    invoiceNumber: "INV-2024-189",
-                    dueDate: "2024-12-10",
-                },
-            ]);
+        // Redirect if not authenticated
+        if (!authLoading && !user) {
+            router.push("/login");
+            return;
+        }
 
-            setInsurance({
-                policyNumber: "POL-123456",
-                provider: "National Insurance Company",
-                coverageType: "Comprehensive Health",
-                expiryDate: "2026-12-31",
-                status: "Active",
-            });
+        // Fetch data when user is available
+        if (user && userData) {
+            fetchBillingData();
+        }
+    }, [user, userData, authLoading, router]);
 
-            setPaymentHistory([
-                {
-                    id: "pay-1",
-                    date: "2024-12-22",
-                    amount: 3500,
-                    method: "Credit Card",
-                    billId: "bill-2",
-                    receiptNumber: "REC-2024-301",
-                },
-                {
-                    id: "pay-2",
-                    date: "2024-11-15",
-                    amount: 8000,
-                    method: "Cash",
-                    billId: "bill-3",
-                    receiptNumber: "REC-2024-245",
-                },
-            ]);
+    const fetchBillingData = async () => {
+        if (!user) return;
 
+        try {
+            setLoading(true);
+            setError(null);
+
+            // Fetch all payments for the patient
+            const payments = await paymentRepo.findByPatientId(user.uid);
+            setBills(payments);
+
+            // Filter payment history (only Completed payments)
+            const history = payments.filter((p) => p.status === "Completed");
+            setPaymentHistory(history);
+
+            // Fetch insurance information
+            try {
+                const insurances = await insurancePolicyRepo.findByPatientId(user.uid);
+                if (insurances.length > 0) {
+                    // Find active insurance
+                    const activeInsurance = insurances.find((i) => i.status === "Active");
+                    setInsurance(activeInsurance || insurances[0]);
+                }
+            } catch (err) {
+                console.log("No insurance found");
+                setInsurance(null);
+            }
+        } catch (err) {
+            console.error("Error fetching billing data:", err);
+            setError("Failed to load billing information. Please try again.");
+        } finally {
             setLoading(false);
-        }, 500);
-    }, []);
+        }
+    };
 
-    const formatDate = (dateStr: string) => {
-        return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    const formatDate = (dateStr: string | Timestamp) => {
+        if (!dateStr) return "N/A";
+        const date = typeof dateStr === "string" ? new Date(dateStr) : (dateStr as Timestamp).toDate();
+        return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    };
+
+    const formatDateForInput = (dateStr: string | Timestamp) => {
+        if (!dateStr) return "";
+        const date = typeof dateStr === "string" ? new Date(dateStr) : (dateStr as Timestamp).toDate();
+        return date.toISOString().split("T")[0]; // Returns YYYY-MM-DD format
     };
 
     const formatCurrency = (amount: number) => {
@@ -118,8 +121,8 @@ export default function PatientBilling() {
         return styles[status.toLowerCase()];
     };
 
-    const handlePayNow = (bill: Bill) => {
-        setSelectedBill(bill);
+    const handlePayNow = (payment: Payment) => {
+        setSelectedBill(payment);
         setShowPaymentModal(true);
     };
 
@@ -131,22 +134,129 @@ export default function PatientBilling() {
         setSelectedBill(null);
     };
 
+    const handleAddInsurance = () => {
+        setShowInsuranceModal(true);
+    };
+
+    const handleInsuranceSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!user) return;
+
+        try {
+            setLoading(true);
+
+            // Create insurance policy directly through the repository
+            await insurancePolicyRepo.create({
+                patientId: user.uid,
+                policyNumber: insuranceForm.policyNumber,
+                provider: insuranceForm.provider,
+                coveragePercentage: parseFloat(insuranceForm.coveragePercentage),
+                maxCoverage: parseFloat(insuranceForm.maxCoverage),
+                startDate: Timestamp.fromDate(new Date(insuranceForm.startDate)),
+                endDate: Timestamp.fromDate(new Date(insuranceForm.endDate)),
+                status: "Active",
+            });
+
+            // Refresh insurance data
+            await fetchBillingData();
+
+            // Reset form and close modal
+            setInsuranceForm({
+                policyNumber: "",
+                provider: "",
+                coveragePercentage: "",
+                maxCoverage: "",
+                startDate: "",
+                endDate: "",
+            });
+            setShowInsuranceModal(false);
+
+            alert("Insurance policy added successfully!");
+        } catch (err: any) {
+            console.error("Error adding insurance:", err);
+            alert(err.message || "Failed to add insurance policy. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUpdateInsurance = () => {
+        if (!insurance) return;
+
+        // Pre-fill the form with existing insurance data
+        setInsuranceForm({
+            policyNumber: insurance.policyNumber,
+            provider: insurance.provider,
+            coveragePercentage: insurance.coveragePercentage.toString(),
+            maxCoverage: insurance.maxCoverage.toString(),
+            startDate: formatDateForInput(insurance.startDate),
+            endDate: formatDateForInput(insurance.endDate),
+        });
+        setShowUpdateInsuranceModal(true);
+    };
+
+    const handleUpdateInsuranceSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!user || !insurance) return;
+
+        try {
+            setLoading(true);
+
+            // Update insurance policy through the repository
+            await insurancePolicyRepo.update(insurance.id, {
+                policyNumber: insuranceForm.policyNumber,
+                provider: insuranceForm.provider,
+                coveragePercentage: parseFloat(insuranceForm.coveragePercentage),
+                maxCoverage: parseFloat(insuranceForm.maxCoverage),
+                startDate: Timestamp.fromDate(new Date(insuranceForm.startDate)),
+                endDate: Timestamp.fromDate(new Date(insuranceForm.endDate)),
+            });
+
+            // Refresh insurance data
+            await fetchBillingData();
+
+            // Reset form and close modal
+            setInsuranceForm({
+                policyNumber: "",
+                provider: "",
+                coveragePercentage: "",
+                maxCoverage: "",
+                startDate: "",
+                endDate: "",
+            });
+            setShowUpdateInsuranceModal(false);
+
+            alert("Insurance policy updated successfully!");
+        } catch (err: any) {
+            console.error("Error updating insurance:", err);
+            alert(err.message || "Failed to update insurance policy. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleViewPolicyDetails = () => {
+        setShowPolicyDetailsModal(true);
+    };
+
     const handleSearch = (query?: string) => {
         console.log("Searching:", query);
     };
 
-    // Filter data
+    // Filter data - using Payment fields
     const filteredBills = bills.filter(
         (b) =>
             !searchQuery ||
-            b.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            b.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase())
+            b.appointmentId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            b.transactionId.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const filteredPayments = paymentHistory.filter((p) => !searchQuery || p.receiptNumber.toLowerCase().includes(searchQuery.toLowerCase()));
+    const filteredPayments = paymentHistory.filter((p) => !searchQuery || p.transactionId.toLowerCase().includes(searchQuery.toLowerCase()));
 
     const totalPending = bills.filter((b) => b.status === "Pending").reduce((sum, b) => sum + b.amount, 0);
-    const totalPaid = bills.filter((b) => b.status === "Paid").reduce((sum, b) => sum + b.amount, 0);
+    const totalPaid = bills.filter((b) => b.status === "Completed").reduce((sum, b) => sum + b.amount, 0);
 
     if (loading) {
         return (
@@ -199,11 +309,11 @@ export default function PatientBilling() {
                             <div key={bill.id} className={styles.billCard}>
                                 <div className={styles.billHeader}>
                                     <div>
-                                        <h3 className={styles.billDescription}>{bill.description}</h3>
+                                        <h3 className={styles.billDescription}>Payment for Appointment</h3>
                                         <div className={styles.billMeta}>
-                                            <span>Invoice: {bill.invoiceNumber}</span>
+                                            <span>Transaction: {bill.transactionId}</span>
                                             <span>•</span>
-                                            <span>Date: {formatDate(bill.date)}</span>
+                                            <span>Appointment: {bill.appointmentId}</span>
                                         </div>
                                     </div>
                                     <span className={`${styles.statusBadge} ${getStatusClass(bill.status)}`}>{bill.status}</span>
@@ -211,12 +321,20 @@ export default function PatientBilling() {
 
                                 <div className={styles.billBody}>
                                     <div className={styles.billAmount}>
-                                        <span className={styles.amountLabel}>Amount:</span>
+                                        <span className={styles.amountLabel}>Total Amount:</span>
                                         <span className={styles.amountValue}>{formatCurrency(bill.amount)}</span>
                                     </div>
+                                    <div className={styles.billAmount}>
+                                        <span className={styles.amountLabel}>Insurance Coverage:</span>
+                                        <span className={styles.amountValue}>{formatCurrency(bill.insuranceCoverage)}</span>
+                                    </div>
+                                    <div className={styles.billAmount}>
+                                        <span className={styles.amountLabel}>Your Portion:</span>
+                                        <span className={styles.amountValue}>{formatCurrency(bill.patientPortion)}</span>
+                                    </div>
                                     <div className={styles.billDue}>
-                                        <span className={styles.dueLabel}>Due Date:</span>
-                                        <span className={styles.dueValue}>{formatDate(bill.dueDate)}</span>
+                                        <span className={styles.dueLabel}>Payment Method:</span>
+                                        <span className={styles.dueValue}>{bill.paymentMethod}</span>
                                     </div>
                                 </div>
 
@@ -227,7 +345,7 @@ export default function PatientBilling() {
                                             Pay Now
                                         </button>
                                     )}
-                                    {bill.status === "Paid" && <button className={styles.receiptBtn}>Download Receipt</button>}
+                                    {bill.status === "Completed" && <button className={styles.receiptBtn}>Download Receipt</button>}
                                 </div>
                             </div>
                         ))}
@@ -257,19 +375,33 @@ export default function PatientBilling() {
                                 </div>
 
                                 <div className={styles.insuranceField}>
-                                    <label>Coverage Type</label>
-                                    <div className={styles.fieldValue}>{insurance.coverageType}</div>
+                                    <label>Coverage Percentage</label>
+                                    <div className={styles.fieldValue}>{insurance.coveragePercentage}%</div>
                                 </div>
 
                                 <div className={styles.insuranceField}>
-                                    <label>Expiry Date</label>
-                                    <div className={styles.fieldValue}>{formatDate(insurance.expiryDate)}</div>
+                                    <label>Max Coverage</label>
+                                    <div className={styles.fieldValue}>{formatCurrency(insurance.maxCoverage)}</div>
+                                </div>
+
+                                <div className={styles.insuranceField}>
+                                    <label>Start Date</label>
+                                    <div className={styles.fieldValue}>{formatDate(insurance.startDate)}</div>
+                                </div>
+
+                                <div className={styles.insuranceField}>
+                                    <label>End Date</label>
+                                    <div className={styles.fieldValue}>{formatDate(insurance.endDate)}</div>
                                 </div>
                             </div>
 
                             <div className={styles.insuranceActions}>
-                                <button className={styles.updateBtn}>Update Insurance Info</button>
-                                <button className={styles.viewBtn}>View Policy Details</button>
+                                <button className={styles.updateBtn} onClick={handleUpdateInsurance}>
+                                    Update Insurance Info
+                                </button>
+                                <button className={styles.viewBtn} onClick={handleViewPolicyDetails}>
+                                    View Policy Details
+                                </button>
                             </div>
                         </div>
                     ) : (
@@ -277,7 +409,9 @@ export default function PatientBilling() {
                             <div className={styles.emptyIcon}>🏥</div>
                             <h3>No Insurance Information</h3>
                             <p>Add your insurance details to streamline billing</p>
-                            <button className={styles.addBtn}>Add Insurance</button>
+                            <button className={styles.addBtn} onClick={handleAddInsurance}>
+                                Add Insurance
+                            </button>
                         </div>
                     )}
                 </div>
@@ -300,13 +434,12 @@ export default function PatientBilling() {
                             </thead>
                             <tbody>
                                 {filteredPayments.map((payment) => {
-                                    const bill = bills.find((b) => b.id === payment.billId);
                                     return (
                                         <tr key={payment.id}>
-                                            <td>{formatDate(payment.date)}</td>
-                                            <td>{payment.receiptNumber}</td>
-                                            <td>{bill?.description || "N/A"}</td>
-                                            <td>{payment.method}</td>
+                                            <td>{payment.paidAt ? formatDate(payment.paidAt) : "N/A"}</td>
+                                            <td>{payment.transactionId}</td>
+                                            <td>Appointment: {payment.appointmentId}</td>
+                                            <td>{payment.paymentMethod}</td>
                                             <td className={styles.historyAmount}>{formatCurrency(payment.amount)}</td>
                                             <td>
                                                 <button className={styles.downloadBtn}>Download</button>
@@ -333,16 +466,24 @@ export default function PatientBilling() {
 
                         <div className={styles.paymentSummary}>
                             <div className={styles.summaryRow}>
-                                <span>Invoice:</span>
-                                <strong>{selectedBill.invoiceNumber}</strong>
+                                <span>Transaction ID:</span>
+                                <strong>{selectedBill.transactionId}</strong>
                             </div>
                             <div className={styles.summaryRow}>
-                                <span>Description:</span>
-                                <strong>{selectedBill.description}</strong>
+                                <span>Appointment ID:</span>
+                                <strong>{selectedBill.appointmentId}</strong>
                             </div>
                             <div className={styles.summaryRow}>
-                                <span>Amount Due:</span>
+                                <span>Total Amount:</span>
                                 <strong className={styles.totalAmount}>{formatCurrency(selectedBill.amount)}</strong>
+                            </div>
+                            <div className={styles.summaryRow}>
+                                <span>Insurance Coverage:</span>
+                                <strong>{formatCurrency(selectedBill.insuranceCoverage)}</strong>
+                            </div>
+                            <div className={styles.summaryRow}>
+                                <span>Your Portion:</span>
+                                <strong className={styles.totalAmount}>{formatCurrency(selectedBill.patientPortion)}</strong>
                             </div>
                         </div>
 
@@ -378,10 +519,293 @@ export default function PatientBilling() {
                                     Cancel
                                 </button>
                                 <button type="submit" className={styles.submitBtn}>
-                                    Pay {formatCurrency(selectedBill.amount)}
+                                    Pay {formatCurrency(selectedBill.patientPortion)}
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Add Insurance Modal */}
+            {showInsuranceModal && (
+                <div className={styles.modal}>
+                    <div className={styles.modalContent}>
+                        <div className={styles.modalHeader}>
+                            <h2>Add Insurance Policy</h2>
+                            <button className={styles.closeBtn} onClick={() => setShowInsuranceModal(false)}>
+                                ×
+                            </button>
+                        </div>
+
+                        <form className={styles.paymentForm} onSubmit={handleInsuranceSubmit}>
+                            <div className={styles.formGroup}>
+                                <label>Policy Number *</label>
+                                <input
+                                    type="text"
+                                    placeholder="Enter policy number"
+                                    value={insuranceForm.policyNumber}
+                                    onChange={(e) => setInsuranceForm({ ...insuranceForm, policyNumber: e.target.value })}
+                                    required
+                                />
+                            </div>
+
+                            <div className={styles.formGroup}>
+                                <label>Insurance Provider *</label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g., Blue Cross, Aetna"
+                                    value={insuranceForm.provider}
+                                    onChange={(e) => setInsuranceForm({ ...insuranceForm, provider: e.target.value })}
+                                    required
+                                />
+                            </div>
+
+                            <div className={styles.formRow}>
+                                <div className={styles.formGroup}>
+                                    <label>Coverage Percentage *</label>
+                                    <input
+                                        type="number"
+                                        placeholder="e.g., 80"
+                                        min="0"
+                                        max="100"
+                                        value={insuranceForm.coveragePercentage}
+                                        onChange={(e) => setInsuranceForm({ ...insuranceForm, coveragePercentage: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className={styles.formGroup}>
+                                    <label>Max Coverage (LKR) *</label>
+                                    <input
+                                        type="number"
+                                        placeholder="e.g., 1000000"
+                                        min="0"
+                                        value={insuranceForm.maxCoverage}
+                                        onChange={(e) => setInsuranceForm({ ...insuranceForm, maxCoverage: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className={styles.formRow}>
+                                <div className={styles.formGroup}>
+                                    <label>Start Date *</label>
+                                    <input
+                                        type="date"
+                                        value={insuranceForm.startDate}
+                                        onChange={(e) => setInsuranceForm({ ...insuranceForm, startDate: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className={styles.formGroup}>
+                                    <label>End Date *</label>
+                                    <input
+                                        type="date"
+                                        value={insuranceForm.endDate}
+                                        onChange={(e) => setInsuranceForm({ ...insuranceForm, endDate: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className={styles.formActions}>
+                                <button type="button" className={styles.cancelBtn} onClick={() => setShowInsuranceModal(false)}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className={styles.submitBtn}>
+                                    Add Insurance
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Update Insurance Modal */}
+            {showUpdateInsuranceModal && insurance && (
+                <div className={styles.modal}>
+                    <div className={styles.modalContent}>
+                        <div className={styles.modalHeader}>
+                            <h2>Update Insurance Policy</h2>
+                            <button className={styles.closeBtn} onClick={() => setShowUpdateInsuranceModal(false)}>
+                                ×
+                            </button>
+                        </div>
+
+                        <form className={styles.paymentForm} onSubmit={handleUpdateInsuranceSubmit}>
+                            <div className={styles.formGroup}>
+                                <label>Policy Number *</label>
+                                <input
+                                    type="text"
+                                    placeholder="Enter policy number"
+                                    value={insuranceForm.policyNumber}
+                                    onChange={(e) => setInsuranceForm({ ...insuranceForm, policyNumber: e.target.value })}
+                                    required
+                                />
+                            </div>
+
+                            <div className={styles.formGroup}>
+                                <label>Insurance Provider *</label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g., Blue Cross, Aetna"
+                                    value={insuranceForm.provider}
+                                    onChange={(e) => setInsuranceForm({ ...insuranceForm, provider: e.target.value })}
+                                    required
+                                />
+                            </div>
+
+                            <div className={styles.formRow}>
+                                <div className={styles.formGroup}>
+                                    <label>Coverage Percentage *</label>
+                                    <input
+                                        type="number"
+                                        placeholder="e.g., 80"
+                                        min="0"
+                                        max="100"
+                                        value={insuranceForm.coveragePercentage}
+                                        onChange={(e) => setInsuranceForm({ ...insuranceForm, coveragePercentage: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className={styles.formGroup}>
+                                    <label>Max Coverage (LKR) *</label>
+                                    <input
+                                        type="number"
+                                        placeholder="e.g., 1000000"
+                                        min="0"
+                                        value={insuranceForm.maxCoverage}
+                                        onChange={(e) => setInsuranceForm({ ...insuranceForm, maxCoverage: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className={styles.formRow}>
+                                <div className={styles.formGroup}>
+                                    <label>Start Date *</label>
+                                    <input
+                                        type="date"
+                                        value={insuranceForm.startDate}
+                                        onChange={(e) => setInsuranceForm({ ...insuranceForm, startDate: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className={styles.formGroup}>
+                                    <label>End Date *</label>
+                                    <input
+                                        type="date"
+                                        value={insuranceForm.endDate}
+                                        onChange={(e) => setInsuranceForm({ ...insuranceForm, endDate: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className={styles.formActions}>
+                                <button type="button" className={styles.cancelBtn} onClick={() => setShowUpdateInsuranceModal(false)}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className={styles.submitBtn}>
+                                    Update Insurance
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* View Policy Details Modal */}
+            {showPolicyDetailsModal && insurance && (
+                <div className={styles.modal}>
+                    <div className={styles.modalContent}>
+                        <div className={styles.modalHeader}>
+                            <h2>Insurance Policy Details</h2>
+                            <button className={styles.closeBtn} onClick={() => setShowPolicyDetailsModal(false)}>
+                                ×
+                            </button>
+                        </div>
+
+                        <div className={styles.policyDetailsContent}>
+                            <div className={styles.detailsSection}>
+                                <h3 className={styles.sectionTitle}>Policy Information</h3>
+                                <div className={styles.detailsGrid}>
+                                    <div className={styles.detailItem}>
+                                        <label>Policy Number:</label>
+                                        <span>{insurance.policyNumber}</span>
+                                    </div>
+                                    <div className={styles.detailItem}>
+                                        <label>Provider:</label>
+                                        <span>{insurance.provider}</span>
+                                    </div>
+                                    <div className={styles.detailItem}>
+                                        <label>Status:</label>
+                                        <span className={`${styles.statusBadge} ${getStatusClass(insurance.status)}`}>{insurance.status}</span>
+                                    </div>
+                                    <div className={styles.detailItem}>
+                                        <label>Patient ID:</label>
+                                        <span>{insurance.patientId}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className={styles.detailsSection}>
+                                <h3 className={styles.sectionTitle}>Coverage Details</h3>
+                                <div className={styles.detailsGrid}>
+                                    <div className={styles.detailItem}>
+                                        <label>Coverage Percentage:</label>
+                                        <span className={styles.highlightValue}>{insurance.coveragePercentage}%</span>
+                                    </div>
+                                    <div className={styles.detailItem}>
+                                        <label>Maximum Coverage:</label>
+                                        <span className={styles.highlightValue}>{formatCurrency(insurance.maxCoverage)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className={styles.detailsSection}>
+                                <h3 className={styles.sectionTitle}>Validity Period</h3>
+                                <div className={styles.detailsGrid}>
+                                    <div className={styles.detailItem}>
+                                        <label>Start Date:</label>
+                                        <span>{formatDate(insurance.startDate)}</span>
+                                    </div>
+                                    <div className={styles.detailItem}>
+                                        <label>End Date:</label>
+                                        <span>{formatDate(insurance.endDate)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className={styles.detailsSection}>
+                                <h3 className={styles.sectionTitle}>Timestamps</h3>
+                                <div className={styles.detailsGrid}>
+                                    <div className={styles.detailItem}>
+                                        <label>Created:</label>
+                                        <span>{formatDate(insurance.createdAt)}</span>
+                                    </div>
+                                    <div className={styles.detailItem}>
+                                        <label>Last Updated:</label>
+                                        <span>{formatDate(insurance.updatedAt)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className={styles.modalActions}>
+                                <button className={styles.closeModalBtn} onClick={() => setShowPolicyDetailsModal(false)}>
+                                    Close
+                                </button>
+                                <button
+                                    className={styles.updateBtn}
+                                    onClick={() => {
+                                        setShowPolicyDetailsModal(false);
+                                        handleUpdateInsurance();
+                                    }}
+                                >
+                                    Edit Policy
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

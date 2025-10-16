@@ -2,9 +2,15 @@
 
 import React, { useState, useEffect } from "react";
 import { StatCard } from "@/components/StatCard";
-import { SearchBar } from "@/components/SearchBar";
 import styles from "./dashboard.module.css";
 import Link from "next/link";
+import { useAuth } from "@/lib/contexts/AuthContext";
+import { useRouter } from "next/navigation";
+import { AppointmentRepository } from "@/lib/firestore/repositories/AppointmentRepository";
+import { AppointmentService } from "@/lib/services/AppointmentService";
+import { NotificationService } from "@/lib/services/NotificationService";
+import { PaymentRepository } from "@/lib/firestore/repositories/PaymentRepository";
+import { Appointment } from "@/lib/types";
 
 interface DashboardStats {
     todayAppointments: number;
@@ -13,7 +19,16 @@ interface DashboardStats {
     pendingBills: number;
 }
 
+// Initialize services at module level
+const appointmentRepo = new AppointmentRepository();
+const notificationService = new NotificationService();
+const appointmentService = new AppointmentService(appointmentRepo, notificationService);
+const paymentRepo = new PaymentRepository();
+
 export default function PatientDashboard() {
+    const { user, loading: authLoading, userData } = useAuth();
+    const router = useRouter();
+
     const [stats, setStats] = useState<DashboardStats>({
         todayAppointments: 0,
         completedToday: 0,
@@ -21,30 +36,74 @@ export default function PatientDashboard() {
         pendingBills: 0,
     });
 
-    const [searchQuery, setSearchQuery] = useState("");
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        // TODO: Replace with actual API call
-        // Simulating API call
-        setTimeout(() => {
-            setStats({
-                todayAppointments: 23,
-                completedToday: 3,
-                upcomingAppointments: 12,
-                pendingBills: 2,
+        // Redirect if not authenticated
+        if (!authLoading && !user) {
+            router.push("/login");
+            return;
+        }
+
+        // Fetch real stats when user is available
+        if (user && userData) {
+            fetchDashboardStats();
+        }
+    }, [user, userData, authLoading, router]);
+
+    const fetchDashboardStats = async () => {
+        if (!user) return;
+
+        try {
+            setLoading(true);
+            setError(null);
+
+            // Fetch all appointments for the patient
+            const appointments = await appointmentService.getPatientAppointments(user.uid);
+
+            // Calculate today's date at midnight for comparison
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+
+            // Today's appointments (any status except cancelled)
+            const todayApts = appointments.filter((apt: Appointment) => {
+                const aptDate = apt.appointmentDate.toDate();
+                aptDate.setHours(0, 0, 0, 0);
+                return aptDate.getTime() === today.getTime() && apt.status !== "Cancelled";
             });
 
-            setLoading(false);
-        }, 500);
-    }, []);
+            // Completed today
+            const completedToday = todayApts.filter((apt: Appointment) => apt.status === "Completed");
 
-    const handleSearch = (query?: string) => {
-        console.log("Searching for:", query || searchQuery);
-        // TODO: Implement search functionality
+            // Upcoming appointments (future dates, not completed/cancelled)
+            const upcoming = appointments.filter((apt: Appointment) => {
+                const aptDate = apt.appointmentDate.toDate();
+                aptDate.setHours(0, 0, 0, 0);
+                return aptDate.getTime() >= today.getTime() && apt.status !== "Completed" && apt.status !== "Cancelled";
+            });
+
+            // Fetch pending bills
+            const payments = await paymentRepo.findByPatientId(user.uid);
+            const pending = payments.filter((p) => p.status === "Pending");
+
+            setStats({
+                todayAppointments: todayApts.length,
+                completedToday: completedToday.length,
+                upcomingAppointments: upcoming.length,
+                pendingBills: pending.length,
+            });
+        } catch (err) {
+            console.error("Error fetching dashboard stats:", err);
+            setError("Failed to load dashboard data. Please try again.");
+        } finally {
+            setLoading(false);
+        }
     };
 
-    if (loading) {
+    if (loading || authLoading) {
         return (
             <div className={styles.container}>
                 <div className={styles.loading}>
@@ -55,10 +114,23 @@ export default function PatientDashboard() {
         );
     }
 
+    if (error) {
+        return (
+            <div className={styles.container}>
+                <div className={styles.error}>
+                    <p>{error}</p>
+                    <button onClick={fetchDashboardStats} className={styles.retryBtn}>
+                        Retry
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className={styles.container}>
             <header className={styles.header}>
-                <h1 className={styles.title}>Welcome back!</h1>
+                <h1 className={styles.title}>Welcome back{userData ? `, ${userData.firstName}` : ""}!</h1>
                 <p className={styles.subtitle}>Here's your health overview for today</p>
             </header>
 
@@ -68,16 +140,6 @@ export default function PatientDashboard() {
                 <StatCard value={stats.completedToday.toString()} label="Completed" variant="green" icon="✓" />
                 <StatCard value={stats.upcomingAppointments.toString()} label="Upcoming" variant="blue" icon="⏰" />
                 <StatCard value={stats.pendingBills.toString()} label="Pending Bills" variant="teal" icon="💳" />
-            </div>
-
-            {/* Search Bar */}
-            <div className={styles.searchSection}>
-                <SearchBar
-                    placeholder="Search appointments, doctors, records..."
-                    value={searchQuery}
-                    onChange={setSearchQuery}
-                    onSearch={handleSearch}
-                />
             </div>
 
             {/* Quick Actions */}

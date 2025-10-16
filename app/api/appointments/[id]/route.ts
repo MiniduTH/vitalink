@@ -8,44 +8,42 @@ const appointmentRepo = new AppointmentRepository();
 const notificationService = new NotificationService();
 const appointmentService = new AppointmentService(appointmentRepo, notificationService);
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const appointment = await appointmentService.getAppointment(params.id);
+        const { id } = await params;
+        const appointment = await appointmentService.getAppointment(id);
         return NextResponse.json({ success: true, data: appointment });
     } catch (error: any) {
         return NextResponse.json({ success: false, error: error.message }, { status: error.name === "NotFoundError" ? 404 : 500 });
     }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params;
         const body = await request.json();
 
         // Handle reschedule
         if (body.appointmentDate && body.timeSlot) {
-            const appointment = await appointmentService.rescheduleAppointment(
-                params.id,
-                Timestamp.fromDate(new Date(body.appointmentDate)),
-                body.timeSlot
-            );
+            const appointment = await appointmentService.rescheduleAppointment(id, Timestamp.fromDate(new Date(body.appointmentDate)), body.timeSlot);
             return NextResponse.json({ success: true, data: appointment });
         }
 
         // Handle cancel
         if (body.status === "Cancelled") {
-            const appointment = await appointmentService.cancelAppointment(params.id);
+            const appointment = await appointmentService.cancelAppointment(id);
             return NextResponse.json({ success: true, data: appointment });
         }
 
         // Handle complete
         if (body.status === "Completed") {
-            const appointment = await appointmentService.completeAppointment(params.id);
+            const appointment = await appointmentService.completeAppointment(id);
             return NextResponse.json({ success: true, data: appointment });
         }
 
         // General update
-        await appointmentRepo.update(params.id, body);
-        const appointment = await appointmentService.getAppointment(params.id);
+        await appointmentRepo.update(id, body);
+        const appointment = await appointmentService.getAppointment(id);
         return NextResponse.json({ success: true, data: appointment });
     } catch (error: any) {
         return NextResponse.json(
@@ -55,9 +53,10 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const appointment = await appointmentService.cancelAppointment(params.id);
+        const { id } = await params;
+        const appointment = await appointmentService.cancelAppointment(id);
         return NextResponse.json({ success: true, data: appointment });
     } catch (error: any) {
         return NextResponse.json({ success: false, error: error.message }, { status: error.name === "NotFoundError" ? 404 : 500 });

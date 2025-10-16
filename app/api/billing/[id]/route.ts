@@ -12,20 +12,22 @@ const notificationService = new NotificationService();
 const insuranceService = new InsuranceService(policyRepo, claimRepo, notificationService);
 const billingService = new BillingService(paymentRepo, insuranceService, notificationService);
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const payment = await billingService.getPayment(params.id);
+        const { id } = await params;
+        const payment = await billingService.getPayment(id);
         return NextResponse.json({ success: true, data: payment });
     } catch (error: any) {
         return NextResponse.json({ success: false, error: error.message }, { status: error.name === "NotFoundError" ? 404 : 500 });
     }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params;
         const body = await request.json();
-        await paymentRepo.update(params.id, body);
-        const payment = await billingService.getPayment(params.id);
+        await paymentRepo.update(id, body);
+        const payment = await billingService.getPayment(id);
         return NextResponse.json({ success: true, data: payment });
     } catch (error: any) {
         return NextResponse.json({ success: false, error: error.message }, { status: error.name === "NotFoundError" ? 404 : 500 });

@@ -5,19 +5,21 @@ import { HealthRecordService } from "@/lib/services/HealthRecordService";
 const healthRecordRepo = new HealthRecordRepository();
 const healthRecordService = new HealthRecordService(healthRecordRepo);
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const healthRecord = await healthRecordService.getHealthRecordByPatientId(params.id);
+        const { id } = await params;
+        const healthRecord = await healthRecordService.getHealthRecordByPatientId(id);
         return NextResponse.json({ success: true, data: healthRecord });
     } catch (error: any) {
         return NextResponse.json({ success: false, error: error.message }, { status: error.name === "NotFoundError" ? 404 : 500 });
     }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params;
         const body = await request.json();
-        const healthRecord = await healthRecordService.getHealthRecordByPatientId(params.id);
+        const healthRecord = await healthRecordService.getHealthRecordByPatientId(id);
         const updated = await healthRecordService.updateHealthRecord(healthRecord.id, body);
         return NextResponse.json({ success: true, data: updated });
     } catch (error: any) {

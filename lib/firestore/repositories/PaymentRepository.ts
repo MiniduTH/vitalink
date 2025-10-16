@@ -23,9 +23,17 @@ export class PaymentRepository {
     }
 
     async findByPatientId(patientId: string): Promise<Payment[]> {
-        const q = query(collection(db, this.collectionName), where("patientId", "==", patientId), orderBy("createdAt", "desc"));
+        // Query without orderBy to avoid requiring composite index
+        const q = query(collection(db, this.collectionName), where("patientId", "==", patientId));
         const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Payment));
+        const payments = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Payment));
+
+        // Sort client-side by createdAt descending
+        return payments.sort((a, b) => {
+            const dateA = a.createdAt.toMillis();
+            const dateB = b.createdAt.toMillis();
+            return dateB - dateA; // Descending order (newest first)
+        });
     }
 
     async findByAppointmentId(appointmentId: string): Promise<Payment | null> {

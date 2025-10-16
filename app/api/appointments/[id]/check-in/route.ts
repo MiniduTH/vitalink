@@ -7,9 +7,10 @@ const appointmentRepo = new AppointmentRepository();
 const notificationService = new NotificationService();
 const appointmentService = new AppointmentService(appointmentRepo, notificationService);
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const appointment = await appointmentService.checkIn(params.id);
+        const { id } = await params;
+        const appointment = await appointmentService.checkIn(id);
         return NextResponse.json({ success: true, data: appointment });
     } catch (error: any) {
         return NextResponse.json(

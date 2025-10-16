@@ -49,9 +49,17 @@ export class AppointmentRepository {
     }
 
     async findByPatientId(patientId: string): Promise<Appointment[]> {
-        const q = query(collection(db, this.collectionName), where("patientId", "==", patientId), orderBy("appointmentDate", "desc"));
+        // Query without orderBy to avoid requiring composite index
+        const q = query(collection(db, this.collectionName), where("patientId", "==", patientId));
         const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Appointment));
+        const appointments = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Appointment));
+
+        // Sort client-side by appointmentDate descending
+        return appointments.sort((a, b) => {
+            const dateA = a.appointmentDate.toMillis();
+            const dateB = b.appointmentDate.toMillis();
+            return dateB - dateA; // Descending order (newest first)
+        });
     }
 
     async findByDoctorId(doctorId: string, date?: Timestamp): Promise<Appointment[]> {
@@ -61,11 +69,17 @@ export class AppointmentRepository {
             constraints.push(where("appointmentDate", "==", date));
         }
 
-        constraints.push(orderBy("appointmentDate", "asc"));
-
+        // Query without orderBy to avoid composite index requirement
         const q = query(collection(db, this.collectionName), ...constraints);
         const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Appointment));
+        const appointments = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Appointment));
+
+        // Sort client-side by appointmentDate ascending
+        return appointments.sort((a, b) => {
+            const dateA = a.appointmentDate.toMillis();
+            const dateB = b.appointmentDate.toMillis();
+            return dateA - dateB; // Ascending order (oldest first)
+        });
     }
 
     async findByDateRange(startDate: Timestamp, endDate: Timestamp): Promise<Appointment[]> {

@@ -4,64 +4,75 @@ import React, { useState, useEffect } from "react";
 import { StatCard } from "@/components/StatCard";
 import { SearchBar } from "@/components/SearchBar";
 import { AppointmentCard } from "@/components/AppointmentCard";
-import { Appointment } from "@/lib/types";
+import { Appointment, BookAppointmentDTO } from "@/lib/types";
 import { Timestamp } from "firebase/firestore";
 import styles from "./appointments.module.css";
+import { useAuth } from "@/lib/contexts/AuthContext";
+import { useRouter } from "next/navigation";
+import { AppointmentRepository } from "@/lib/firestore/repositories/AppointmentRepository";
+import { AppointmentService } from "@/lib/services/AppointmentService";
+import { NotificationService } from "@/lib/services/NotificationService";
+
+// Initialize services at module level
+const appointmentRepo = new AppointmentRepository();
+const notificationService = new NotificationService();
+const appointmentService = new AppointmentService(appointmentRepo, notificationService);
 
 export default function PatientAppointments() {
+    const { user, loading: authLoading, userData } = useAuth();
+    const router = useRouter();
+
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [filter, setFilter] = useState<"all" | "upcoming" | "past">("upcoming");
     const [loading, setLoading] = useState(true);
     const [showBookingForm, setShowBookingForm] = useState(false);
+    const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+    const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [bookingData, setBookingData] = useState<Partial<BookAppointmentDTO>>({
+        patientId: "",
+        doctorId: "",
+        departmentId: "",
+        appointmentDate: Timestamp.now(),
+        timeSlot: "",
+        reason: "",
+        status: "Scheduled",
+    });
+    const [rescheduleData, setRescheduleData] = useState({
+        newDate: "",
+        newTimeSlot: "",
+    });
 
     useEffect(() => {
-        // TODO: Replace with actual API call
-        setTimeout(() => {
-            setAppointments([
-                {
-                    id: "1",
-                    patientId: "John Doe",
-                    doctorId: "Dr. Sarah Johnson",
-                    departmentId: "Cardiology",
-                    appointmentDate: Timestamp.fromDate(new Date("2025-01-20")),
-                    timeSlot: "09:00 AM",
-                    reason: "Annual checkup",
-                    status: "Scheduled",
-                    notes: "",
-                    createdAt: Timestamp.now(),
-                    updatedAt: Timestamp.now(),
-                },
-                {
-                    id: "2",
-                    patientId: "John Doe",
-                    doctorId: "Dr. Michael Chen",
-                    departmentId: "General Medicine",
-                    appointmentDate: Timestamp.fromDate(new Date("2025-01-25")),
-                    timeSlot: "02:30 PM",
-                    reason: "Follow-up consultation",
-                    status: "Confirmed",
-                    notes: "",
-                    createdAt: Timestamp.now(),
-                    updatedAt: Timestamp.now(),
-                },
-                {
-                    id: "3",
-                    patientId: "John Doe",
-                    doctorId: "Dr. Emily Williams",
-                    departmentId: "Orthopedics",
-                    appointmentDate: Timestamp.fromDate(new Date("2024-12-15")),
-                    timeSlot: "11:00 AM",
-                    reason: "Knee pain assessment",
-                    status: "Completed",
-                    notes: "",
-                    createdAt: Timestamp.now(),
-                    updatedAt: Timestamp.now(),
-                },
-            ]);
+        // Redirect if not authenticated
+        if (!authLoading && !user) {
+            router.push("/login");
+            return;
+        }
+
+        // Fetch appointments when user is available
+        if (user && userData) {
+            fetchAppointments();
+        }
+    }, [user, userData, authLoading, router]);
+
+    const fetchAppointments = async () => {
+        if (!user) return;
+
+        try {
+            setLoading(true);
+            setError(null);
+
+            const data = await appointmentService.getPatientAppointments(user.uid);
+            setAppointments(data);
+        } catch (err) {
+            console.error("Error fetching appointments:", err);
+            setError("Failed to load appointments. Please try again.");
+        } finally {
             setLoading(false);
-        }, 500);
-    }, []);
+        }
+    };
 
     const filteredAppointments = appointments.filter((apt) => {
         const aptDate = apt.appointmentDate.toDate();
@@ -91,7 +102,7 @@ export default function PatientAppointments() {
         const aptDate = a.appointmentDate.toDate();
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        return aptDate >= today && a.status !== "Completed" && a.status !== "Cancelled";
+        return aptDate >= today && a.status !== "Completed" && a.status !== "Cancelled" && a.status !== "Confirmed" && a.status !== "CheckedIn";
     }).length;
 
     const todayCount = appointments.filter((a) => {
@@ -102,33 +113,132 @@ export default function PatientAppointments() {
         return aptDate.getTime() === today.getTime();
     }).length;
 
-    const completedCount = appointments.filter((a) => a.status === "Completed").length;
+    const completedCount = appointments.filter((a) => a.status === "Completed" || a.status === "CheckedIn").length;
 
     const handleSearch = (query?: string) => {
         console.log("Searching:", query);
     };
 
-    const handleCheckIn = (id: string) => {
-        console.log("Check in appointment:", id);
-        // TODO: Implement check-in
+    const handleCheckIn = async (id: string) => {
+        try {
+            await appointmentService.checkIn(id);
+            await fetchAppointments(); // Refresh list
+            alert("Successfully checked in!");
+        } catch (err: any) {
+            console.error("Error checking in:", err);
+            alert(err.message || "Failed to check in. Please try again.");
+        }
     };
 
-    const handleReschedule = (id: string) => {
-        console.log("Reschedule appointment:", id);
-        // TODO: Implement reschedule
+    const handleReschedule = async (id: string) => {
+        // Open reschedule modal with current appointment details
+        const appointment = appointments.find((apt) => apt.id === id);
+        if (appointment) {
+            setSelectedAppointmentId(id);
+            setRescheduleData({
+                newDate: "",
+                newTimeSlot: appointment.timeSlot, // Pre-fill with current time slot
+            });
+            setShowRescheduleModal(true);
+        }
     };
 
-    const handleCancel = (id: string) => {
-        console.log("Cancel appointment:", id);
-        // TODO: Implement cancel
+    const handleRescheduleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!selectedAppointmentId || !rescheduleData.newDate || !rescheduleData.newTimeSlot) {
+            alert("Please select both date and time slot");
+            return;
+        }
+
+        try {
+            const newDate = Timestamp.fromDate(new Date(rescheduleData.newDate));
+            await appointmentService.rescheduleAppointment(selectedAppointmentId, newDate, rescheduleData.newTimeSlot);
+            await fetchAppointments(); // Refresh list
+            setShowRescheduleModal(false);
+            setSelectedAppointmentId(null);
+            setRescheduleData({ newDate: "", newTimeSlot: "" });
+            alert("Appointment rescheduled successfully!");
+        } catch (err: any) {
+            console.error("Error rescheduling appointment:", err);
+            alert(err.message || "Failed to reschedule appointment. Please try again.");
+        }
     };
 
-    if (loading) {
+    const handleCancel = async (id: string) => {
+        if (!confirm("Are you sure you want to cancel this appointment?")) {
+            return;
+        }
+
+        try {
+            await appointmentService.cancelAppointment(id);
+            await fetchAppointments(); // Refresh list
+            alert("Appointment cancelled successfully");
+        } catch (err: any) {
+            console.error("Error cancelling appointment:", err);
+            alert(err.message || "Failed to cancel appointment. Please try again.");
+        }
+    };
+
+    const handleBookSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!user || !bookingData.doctorId || !bookingData.departmentId || !bookingData.timeSlot || !bookingData.reason) {
+            alert("Please fill in all required fields");
+            return;
+        }
+
+        try {
+            const appointmentData: BookAppointmentDTO = {
+                patientId: user.uid,
+                doctorId: bookingData.doctorId,
+                departmentId: bookingData.departmentId,
+                appointmentDate: bookingData.appointmentDate || Timestamp.now(),
+                timeSlot: bookingData.timeSlot,
+                reason: bookingData.reason,
+                status: "Scheduled",
+                notes: "",
+            };
+
+            await appointmentService.bookAppointment(appointmentData);
+            await fetchAppointments(); // Refresh list
+            setShowBookingForm(false);
+            // Reset form
+            setBookingData({
+                patientId: "",
+                doctorId: "",
+                departmentId: "",
+                appointmentDate: Timestamp.now(),
+                timeSlot: "",
+                reason: "",
+                status: "Scheduled",
+            });
+            alert("Appointment booked successfully!");
+        } catch (err: any) {
+            console.error("Error booking appointment:", err);
+            alert(err.message || "Failed to book appointment. Please try again.");
+        }
+    };
+
+    if (loading || authLoading) {
         return (
             <div className={styles.container}>
                 <div className={styles.loading}>
                     <div className={styles.spinner}></div>
                     <p>Loading appointments...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className={styles.container}>
+                <div className={styles.error}>
+                    <p>{error}</p>
+                    <button onClick={fetchAppointments} className={styles.retryBtn}>
+                        Retry
+                    </button>
                 </div>
             </div>
         );
@@ -173,41 +283,73 @@ export default function PatientAppointments() {
                                 ×
                             </button>
                         </div>
-                        <form className={styles.form}>
+                        <form className={styles.form} onSubmit={handleBookSubmit}>
                             <div className={styles.formGroup}>
-                                <label>Department</label>
-                                <select>
-                                    <option>Select Department</option>
-                                    <option>Cardiology</option>
-                                    <option>General Medicine</option>
-                                    <option>Orthopedics</option>
-                                    <option>Pediatrics</option>
+                                <label>Department*</label>
+                                <select
+                                    required
+                                    value={bookingData.departmentId}
+                                    onChange={(e) => setBookingData({ ...bookingData, departmentId: e.target.value })}
+                                >
+                                    <option value="">Select Department</option>
+                                    <option value="dept-cardiology">Cardiology</option>
+                                    <option value="dept-general">General Medicine</option>
+                                    <option value="dept-orthopedics">Orthopedics</option>
+                                    <option value="dept-pediatrics">Pediatrics</option>
                                 </select>
                             </div>
                             <div className={styles.formGroup}>
-                                <label>Doctor</label>
-                                <select>
-                                    <option>Select Doctor</option>
-                                    <option>Dr. Sarah Johnson</option>
-                                    <option>Dr. Michael Chen</option>
+                                <label>Doctor*</label>
+                                <select
+                                    required
+                                    value={bookingData.doctorId}
+                                    onChange={(e) => setBookingData({ ...bookingData, doctorId: e.target.value })}
+                                >
+                                    <option value="">Select Doctor</option>
+                                    <option value="doc-sarah">Dr. Sarah Johnson</option>
+                                    <option value="doc-michael">Dr. Michael Chen</option>
+                                    <option value="doc-emily">Dr. Emily Williams</option>
                                 </select>
                             </div>
                             <div className={styles.formGroup}>
-                                <label>Date</label>
-                                <input type="date" />
+                                <label>Date*</label>
+                                <input
+                                    type="date"
+                                    required
+                                    min={new Date().toISOString().split("T")[0]}
+                                    onChange={(e) =>
+                                        setBookingData({
+                                            ...bookingData,
+                                            appointmentDate: Timestamp.fromDate(new Date(e.target.value)),
+                                        })
+                                    }
+                                />
                             </div>
                             <div className={styles.formGroup}>
-                                <label>Time Slot</label>
-                                <select>
-                                    <option>Select Time</option>
-                                    <option>09:00 AM</option>
-                                    <option>10:00 AM</option>
-                                    <option>02:00 PM</option>
+                                <label>Time Slot*</label>
+                                <select
+                                    required
+                                    value={bookingData.timeSlot}
+                                    onChange={(e) => setBookingData({ ...bookingData, timeSlot: e.target.value })}
+                                >
+                                    <option value="">Select Time</option>
+                                    <option value="09:00 AM">09:00 AM</option>
+                                    <option value="10:00 AM">10:00 AM</option>
+                                    <option value="11:00 AM">11:00 AM</option>
+                                    <option value="02:00 PM">02:00 PM</option>
+                                    <option value="03:00 PM">03:00 PM</option>
+                                    <option value="04:00 PM">04:00 PM</option>
                                 </select>
                             </div>
                             <div className={styles.formGroup}>
-                                <label>Reason for Visit</label>
-                                <textarea rows={3} placeholder="Describe your symptoms or reason for visit"></textarea>
+                                <label>Reason for Visit*</label>
+                                <textarea
+                                    rows={3}
+                                    placeholder="Describe your symptoms or reason for visit"
+                                    required
+                                    value={bookingData.reason}
+                                    onChange={(e) => setBookingData({ ...bookingData, reason: e.target.value })}
+                                ></textarea>
                             </div>
                             <div className={styles.formActions}>
                                 <button type="button" className={styles.cancelBtn} onClick={() => setShowBookingForm(false)}>
@@ -215,6 +357,66 @@ export default function PatientAppointments() {
                                 </button>
                                 <button type="submit" className={styles.submitBtn}>
                                     Book Appointment
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Reschedule Modal */}
+            {showRescheduleModal && selectedAppointmentId && (
+                <div className={styles.modal}>
+                    <div className={styles.modalContent}>
+                        <div className={styles.modalHeader}>
+                            <h2>Reschedule Appointment</h2>
+                            <button className={styles.closeBtn} onClick={() => setShowRescheduleModal(false)}>
+                                ×
+                            </button>
+                        </div>
+                        <form className={styles.form} onSubmit={handleRescheduleSubmit}>
+                            <div className={styles.formGroup}>
+                                <label>New Date*</label>
+                                <input
+                                    type="date"
+                                    required
+                                    min={new Date().toISOString().split("T")[0]}
+                                    value={rescheduleData.newDate}
+                                    onChange={(e) => setRescheduleData({ ...rescheduleData, newDate: e.target.value })}
+                                />
+                            </div>
+                            <div className={styles.formGroup}>
+                                <label>New Time Slot*</label>
+                                <select
+                                    required
+                                    value={rescheduleData.newTimeSlot}
+                                    onChange={(e) => setRescheduleData({ ...rescheduleData, newTimeSlot: e.target.value })}
+                                >
+                                    <option value="">Select Time</option>
+                                    <option value="09:00 AM">09:00 AM</option>
+                                    <option value="10:00 AM">10:00 AM</option>
+                                    <option value="11:00 AM">11:00 AM</option>
+                                    <option value="02:00 PM">02:00 PM</option>
+                                    <option value="03:00 PM">03:00 PM</option>
+                                    <option value="04:00 PM">04:00 PM</option>
+                                </select>
+                            </div>
+                            <div className={styles.infoBox}>
+                                <p>💡 Your appointment will be rescheduled and notifications will be sent to you and the doctor.</p>
+                            </div>
+                            <div className={styles.formActions}>
+                                <button
+                                    type="button"
+                                    className={styles.cancelBtn}
+                                    onClick={() => {
+                                        setShowRescheduleModal(false);
+                                        setSelectedAppointmentId(null);
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button type="submit" className={styles.submitBtn}>
+                                    Confirm Reschedule
                                 </button>
                             </div>
                         </form>

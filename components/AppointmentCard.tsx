@@ -38,22 +38,50 @@ export function AppointmentCard({ appointment, onCheckIn, onCancel, onReschedule
         }
     };
 
+    // Convert IDs to human-readable names
+    const getDoctorName = (doctorId: string) => {
+        const doctors: Record<string, string> = {
+            "doc-sarah": "Dr. Sarah Johnson",
+            "doc-michael": "Dr. Michael Chen",
+            "doc-emily": "Dr. Emily Williams",
+        };
+        return doctors[doctorId] || doctorId;
+    };
+
+    const getDepartmentName = (deptId: string) => {
+        const departments: Record<string, string> = {
+            "dept-cardiology": "Cardiology",
+            "dept-general": "General Medicine",
+            "dept-orthopedics": "Orthopedics",
+            "dept-pediatrics": "Pediatrics",
+        };
+        return departments[deptId] || deptId;
+    };
+
     const canCheckIn = appointment.status === "Scheduled" || appointment.status === "Confirmed";
     const canCancel = appointment.status !== "Completed" && appointment.status !== "Cancelled";
     const canReschedule = appointment.status !== "Completed" && appointment.status !== "Cancelled";
+
+    // Create a verbose title from reason and department
+    const appointmentTitle = appointment.reason || `${getDepartmentName(appointment.departmentId)} Consultation`;
 
     return (
         <div className={`${styles.appointmentCard} ${getStatusClass()}`} onClick={() => onClick?.(appointment.id)}>
             <div className={styles.cardContent}>
                 <div className={styles.header}>
-                    <h3 className={styles.patientName}>{appointment.patientId}</h3>
+                    <div className={styles.headerLeft}>
+                        <h3 className={styles.patientName}>{appointmentTitle}</h3>
+                        <span className={`${styles.statusBadge} ${getStatusClass()}`}>{appointment.status}</span>
+                    </div>
                     <button className={styles.arrowButton} aria-label="View details">
                         ›
                     </button>
                 </div>
 
                 <div className={styles.details}>
-                    <p className={styles.doctor}>{appointment.doctorId}</p>
+                    <p className={styles.doctor}>
+                        {getDoctorName(appointment.doctorId)} • {getDepartmentName(appointment.departmentId)}
+                    </p>
                     <div className={styles.timeInfo}>
                         <span className={styles.time}>{appointment.timeSlot}</span>
                         <span className={styles.separator}>•</span>

@@ -8,17 +8,19 @@ const patientRepo = new PatientRepository();
 const healthRecordRepo = new HealthRecordRepository();
 const patientService = new PatientService(patientRepo, healthRecordRepo);
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const patient = await patientService.getPatient(params.id);
+        const { id } = await params;
+        const patient = await patientService.getPatient(id);
         return NextResponse.json({ success: true, data: patient });
     } catch (error: any) {
         return NextResponse.json({ success: false, error: error.message }, { status: error.name === "NotFoundError" ? 404 : 500 });
     }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params;
         const body = await request.json();
 
         // Convert date string to Timestamp if provided
@@ -26,7 +28,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
             body.dateOfBirth = Timestamp.fromDate(new Date(body.dateOfBirth));
         }
 
-        const patient = await patientService.updatePatient(params.id, body);
+        const patient = await patientService.updatePatient(id, body);
         return NextResponse.json({ success: true, data: patient });
     } catch (error: any) {
         return NextResponse.json(
@@ -36,9 +38,10 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        await patientRepo.delete(params.id);
+        const { id } = await params;
+        await patientRepo.delete(id);
         return NextResponse.json({ success: true, message: "Patient deleted" });
     } catch (error: any) {
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });

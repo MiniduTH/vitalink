@@ -154,6 +154,56 @@
     margin: 0 0 var(--space-md) 0;
 }
 
+/* Health Profile */
+.profileGrid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+}
+
+.profileCard {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-lg);
+    background: white;
+    border-radius: var(--radius-lg);
+    border: 2px solid var(--border-light);
+    transition: all var(--transition-base);
+}
+
+.profileCard:hover {
+    border-color: var(--accent-teal);
+    box-shadow: var(--shadow-sm);
+}
+
+.profileIcon {
+    font-size: 2.5rem;
+    flex-shrink: 0;
+}
+
+.profileInfo {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: var(--space-xs);
+}
+
+.profileLabel {
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
+    color: var(--text-gray);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.profileValue {
+    font-size: var(--text-base);
+    font-weight: var(--font-medium);
+    color: var(--text-dark);
+    line-height: var(--leading-normal);
+}
+
 /* Vital Signs */
 .vitalsGrid {
     display: grid;
@@ -551,6 +601,10 @@
         padding: var(--space-md) var(--space-xl);
     }
 
+    .profileGrid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
     .vitalsGrid {
         grid-template-columns: repeat(4, 1fr);
         gap: var(--space-lg);
@@ -611,9 +665,87 @@
     }
 }
 
+/* Empty State */
+.emptyState {
+    text-align: center;
+    padding: var(--space-2xl) var(--space-lg);
+    background: white;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sm);
+}
+
+.emptyIcon {
+    font-size: 4rem;
+    margin-bottom: var(--space-md);
+}
+
+.emptyState h3 {
+    font-size: var(--text-xl);
+    font-weight: var(--font-semibold);
+    color: var(--text-dark);
+    margin: 0 0 var(--space-xs) 0;
+}
+
+.emptyState p {
+    color: var(--text-gray);
+    font-size: var(--text-base);
+    margin: 0;
+    line-height: var(--leading-normal);
+}
+
+/* Empty Message for sections */
+.emptyMessage {
+    padding: var(--space-xl);
+    background: var(--bg-light);
+    border-radius: var(--radius-lg);
+    text-align: center;
+}
+
+.emptyMessage p {
+    margin: 0;
+    font-size: var(--text-base);
+    color: var(--text-gray);
+}
+
+/* Lab Results List in Encounter Cards */
+.labResultsList {
+    margin: var(--space-sm) 0 0 var(--space-lg);
+    padding: 0;
+}
+
+.labResultsList li {
+    margin-bottom: var(--space-xs);
+    color: var(--text-dark);
+    line-height: var(--leading-normal);
+}
+
+/* Encounter Notes */
+.encounterNotes {
+    padding: var(--space-sm);
+    background: var(--bg-light);
+    border-radius: var(--radius-md);
+    margin-top: var(--space-sm);
+}
+
+.encounterNotes strong {
+    color: var(--text-gray);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.encounterNotes p {
+    margin: var(--space-xs) 0 0 0;
+    color: var(--text-dark);
+}
+
 /* Large: 1440px+ */
 @media (min-width: 1440px) {
     .container {
         max-width: 1400px;
+    }
+
+    .profileGrid {
+        grid-template-columns: repeat(3, 1fr);
     }
 }

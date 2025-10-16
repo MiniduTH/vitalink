@@ -205,7 +205,7 @@ export default function AppointmentsPage() {
                                         onCheckIn={handleCheckIn}
                                         onCancel={handleCancel}
                                         onReschedule={handleReschedule}
-                                        onView={handleViewAppointment}
+                                        onClick={handleViewAppointment}
                                     />
                                 ))}
                             </div>

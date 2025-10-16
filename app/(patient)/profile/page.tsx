@@ -2,46 +2,34 @@
 
 import React, { useState, useEffect } from "react";
 import styles from "./profile.module.css";
-import { Timestamp } from "firebase/firestore";
+import { Timestamp, doc, setDoc } from "firebase/firestore";
 import { StatCard } from "@/components/StatCard";
+import { useAuth } from "@/lib/contexts/AuthContext";
+import { useRouter } from "next/navigation";
+import { PatientRepository } from "@/lib/firestore/repositories/PatientRepository";
+import { HealthRecordRepository } from "@/lib/firestore/repositories/HealthRecordRepository";
+import { PatientService } from "@/lib/services/PatientService";
+import { Patient, CreatePatientDTO } from "@/lib/types";
+import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
+import { auth, db } from "@/lib/firebase/config";
 
-interface ProfileData {
-    firstName: string;
-    lastName: string;
-    email: string;
-    contactNumber: string;
-    dateOfBirth: string;
-    gender: string;
-    address: string;
-    emergencyContact: {
-        name: string;
-        relationship: string;
-        phone: string;
-    };
-}
+// Initialize services at module level
+const patientRepo = new PatientRepository();
+const healthRecordRepo = new HealthRecordRepository();
+const patientService = new PatientService(patientRepo, healthRecordRepo);
 
 export default function PatientProfile() {
-    const [activeTab, setActiveTab] = useState<"personal" | "security" | "preferences">("personal");
+    const { user, loading: authLoading, userData } = useAuth();
+    const router = useRouter();
+
+    const [activeTab, setActiveTab] = useState<"personal" | "security">("personal");
     const [isEditing, setIsEditing] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saveLoading, setSaveLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const [profileData, setProfileData] = useState<ProfileData>({
-        firstName: "",
-        lastName: "",
-        email: "",
-        contactNumber: "",
-        dateOfBirth: "",
-        gender: "",
-        address: "",
-        emergencyContact: {
-            name: "",
-            relationship: "",
-            phone: "",
-        },
-    });
-
-    const [formData, setFormData] = useState<ProfileData>(profileData);
+    const [profileData, setProfileData] = useState<Patient | null>(null);
+    const [formData, setFormData] = useState<Partial<CreatePatientDTO>>({});
     const [passwordForm, setPasswordForm] = useState({
         currentPassword: "",
         newPassword: "",
@@ -49,27 +37,74 @@ export default function PatientProfile() {
     });
 
     useEffect(() => {
-        // TODO: Replace with actual API call to fetch patient data
-        setTimeout(() => {
-            const mockData: ProfileData = {
-                firstName: "John",
-                lastName: "Doe",
-                email: "john.doe@example.com",
-                contactNumber: "0771234567",
-                dateOfBirth: "1990-01-15",
-                gender: "Male",
-                address: "123 Main Street, Colombo 07, Sri Lanka",
-                emergencyContact: {
-                    name: "Jane Doe",
-                    relationship: "Spouse",
-                    phone: "0779876543",
-                },
-            };
-            setProfileData(mockData);
-            setFormData(mockData);
+        // Redirect if not authenticated
+        if (!authLoading && !user) {
+            router.push("/login");
+            return;
+        }
+
+        // Fetch patient data when user is available
+        if (user && userData) {
+            fetchPatientData();
+        }
+    }, [user, userData, authLoading, router]);
+
+    const fetchPatientData = async () => {
+        if (!user) return;
+
+        try {
+            setLoading(true);
+            setError(null);
+
+            // Try to get existing patient data
+            let patient = await patientService.getPatient(user.uid).catch(async (err) => {
+                // If patient doesn't exist, create from userData
+                if (err.message === "Patient not found" && userData) {
+                    console.log("Creating patient profile from user data...");
+
+                    // Create patient document in Firestore using setDoc to use the user's UID as document ID
+                    const patientDocRef = doc(db, "patients", user.uid);
+                    await setDoc(patientDocRef, {
+                        firstName: userData.firstName || "User",
+                        lastName: userData.lastName || "Name",
+                        email: userData.email || user.email || "",
+                        contactNumber: userData.contactNumber || "",
+                        dateOfBirth: userData.dateOfBirth || Timestamp.fromDate(new Date("2000-01-01")),
+                        gender: userData.gender || "Other",
+                        address: userData.address || "",
+                        emergencyContact: userData.emergencyContact || {
+                            name: "",
+                            relationship: "",
+                            phone: "",
+                        },
+                        createdAt: Timestamp.now(),
+                        updatedAt: Timestamp.now(),
+                    });
+
+                    // Fetch the newly created patient
+                    return patientService.getPatient(user.uid);
+                }
+                throw err; // Re-throw if it's a different error
+            });
+
+            setProfileData(patient);
+            setFormData({
+                firstName: patient.firstName,
+                lastName: patient.lastName,
+                email: patient.email,
+                contactNumber: patient.contactNumber,
+                dateOfBirth: patient.dateOfBirth,
+                gender: patient.gender,
+                address: patient.address,
+                emergencyContact: patient.emergencyContact,
+            });
+        } catch (err) {
+            console.error("Error fetching patient data:", err);
+            setError("Failed to load profile. Please try again.");
+        } finally {
             setLoading(false);
-        }, 500);
-    }, []);
+        }
+    };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -79,9 +114,14 @@ export default function PatientProfile() {
             setFormData({
                 ...formData,
                 emergencyContact: {
-                    ...formData.emergencyContact,
+                    ...(formData.emergencyContact || { name: "", relationship: "", phone: "" }),
                     [field]: value,
                 },
+            });
+        } else if (name === "dateOfBirth") {
+            setFormData({
+                ...formData,
+                [name]: Timestamp.fromDate(new Date(value)),
             });
         } else {
             setFormData({
@@ -92,18 +132,35 @@ export default function PatientProfile() {
     };
 
     const handleSaveProfile = async () => {
+        if (!user || !formData) return;
+
         setSaveLoading(true);
-        // TODO: Implement actual API call to update patient profile
-        setTimeout(() => {
-            setProfileData(formData);
+        try {
+            await patientService.updatePatient(user.uid, formData as Partial<CreatePatientDTO>);
+            await fetchPatientData(); // Refresh data
             setIsEditing(false);
-            setSaveLoading(false);
             alert("Profile updated successfully!");
-        }, 1000);
+        } catch (err: any) {
+            console.error("Error updating profile:", err);
+            alert(err.message || "Failed to update profile. Please try again.");
+        } finally {
+            setSaveLoading(false);
+        }
     };
 
     const handleCancelEdit = () => {
-        setFormData(profileData);
+        if (profileData) {
+            setFormData({
+                firstName: profileData.firstName,
+                lastName: profileData.lastName,
+                email: profileData.email,
+                contactNumber: profileData.contactNumber,
+                dateOfBirth: profileData.dateOfBirth,
+                gender: profileData.gender,
+                address: profileData.address,
+                emergencyContact: profileData.emergencyContact,
+            });
+        }
         setIsEditing(false);
     };
 
@@ -120,26 +177,78 @@ export default function PatientProfile() {
             return;
         }
 
-        // TODO: Implement actual password change API call
-        alert("Password change would happen here. Integration with Firebase Auth needed.");
-        setPasswordForm({
-            currentPassword: "",
-            newPassword: "",
-            confirmPassword: "",
-        });
+        if (!auth.currentUser || !user?.email) {
+            alert("Not authenticated");
+            return;
+        }
+
+        try {
+            // Reauthenticate user before changing password
+            const credential = EmailAuthProvider.credential(user.email, passwordForm.currentPassword);
+            await reauthenticateWithCredential(auth.currentUser, credential);
+
+            // Update password
+            await updatePassword(auth.currentUser, passwordForm.newPassword);
+
+            alert("Password updated successfully!");
+            setPasswordForm({
+                currentPassword: "",
+                newPassword: "",
+                confirmPassword: "",
+            });
+        } catch (err: any) {
+            console.error("Error changing password:", err);
+            if (err.code === "auth/wrong-password") {
+                alert("Current password is incorrect");
+            } else if (err.code === "auth/requires-recent-login") {
+                alert("Please log out and log in again before changing your password");
+            } else {
+                alert(err.message || "Failed to change password. Please try again.");
+            }
+        }
     };
 
-    const formatDate = (dateStr: string) => {
-        if (!dateStr) return "N/A";
-        return new Date(dateStr).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+    const formatDate = (ts: Timestamp | string) => {
+        if (!ts) return "N/A";
+        const date = typeof ts === "string" ? new Date(ts) : (ts as Timestamp).toDate();
+        return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
     };
 
-    if (loading) {
+    const formatDateForInput = (ts: Timestamp | string | undefined) => {
+        if (!ts) return "";
+        const date = typeof ts === "string" ? new Date(ts) : (ts as Timestamp).toDate();
+        return date.toISOString().split("T")[0];
+    };
+
+    if (loading || authLoading) {
         return (
             <div className={styles.container}>
                 <div className={styles.loading}>
                     <div className={styles.spinner}></div>
                     <p>Loading profile...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className={styles.container}>
+                <div className={styles.error}>
+                    <p>{error}</p>
+                    <button onClick={fetchPatientData} className={styles.retryBtn}>
+                        Retry
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (!profileData) {
+        return (
+            <div className={styles.container}>
+                <div className={styles.emptyState}>
+                    <p>No profile data found</p>
                 </div>
             </div>
         );
@@ -152,13 +261,6 @@ export default function PatientProfile() {
                 <p className={styles.subtitle}>Manage your account information and settings</p>
             </header>
 
-            {/* Stats Cards - Quick Overview */}
-            <div className={styles.statsGrid}>
-                <StatCard value="3" label="Upcoming Visits" variant="blue" icon="📅" />
-                <StatCard value="12" label="Total Visits" variant="green" icon="✓" />
-                <StatCard value="Active" label="Account Status" variant="pink" icon="👤" />
-            </div>
-
             {/* Tabs */}
             <div className={styles.tabs}>
                 <button className={`${styles.tab} ${activeTab === "personal" ? styles.activeTab : ""}`} onClick={() => setActiveTab("personal")}>
@@ -166,12 +268,6 @@ export default function PatientProfile() {
                 </button>
                 <button className={`${styles.tab} ${activeTab === "security" ? styles.activeTab : ""}`} onClick={() => setActiveTab("security")}>
                     Security
-                </button>
-                <button
-                    className={`${styles.tab} ${activeTab === "preferences" ? styles.activeTab : ""}`}
-                    onClick={() => setActiveTab("preferences")}
-                >
-                    Preferences
                 </button>
             </div>
 
@@ -244,7 +340,13 @@ export default function PatientProfile() {
                                 <div className={styles.formField}>
                                     <label>Date of Birth</label>
                                     {isEditing ? (
-                                        <input type="date" name="dateOfBirth" value={formData.dateOfBirth} onChange={handleInputChange} required />
+                                        <input
+                                            type="date"
+                                            name="dateOfBirth"
+                                            value={formatDateForInput(formData.dateOfBirth)}
+                                            onChange={handleInputChange}
+                                            required
+                                        />
                                     ) : (
                                         <div className={styles.fieldValue}>{formatDate(profileData.dateOfBirth)}</div>
                                     )}
@@ -285,7 +387,7 @@ export default function PatientProfile() {
                                         <input
                                             type="text"
                                             name="emergencyContact.name"
-                                            value={formData.emergencyContact.name}
+                                            value={formData.emergencyContact?.name || ""}
                                             onChange={handleInputChange}
                                             required
                                         />
@@ -300,7 +402,7 @@ export default function PatientProfile() {
                                         <input
                                             type="text"
                                             name="emergencyContact.relationship"
-                                            value={formData.emergencyContact.relationship}
+                                            value={formData.emergencyContact?.relationship || ""}
                                             onChange={handleInputChange}
                                             required
                                         />
@@ -315,7 +417,7 @@ export default function PatientProfile() {
                                         <input
                                             type="tel"
                                             name="emergencyContact.phone"
-                                            value={formData.emergencyContact.phone}
+                                            value={formData.emergencyContact?.phone || ""}
                                             onChange={handleInputChange}
                                             required
                                         />
@@ -412,91 +514,6 @@ export default function PatientProfile() {
                                     </div>
                                     <span className={styles.currentBadge}>Current</span>
                                 </div>
-                            </div>
-                        </section>
-                    </div>
-                </div>
-            )}
-
-            {/* Preferences Tab */}
-            {activeTab === "preferences" && (
-                <div className={styles.content}>
-                    <div className={styles.profileCard}>
-                        <section className={styles.section}>
-                            <h3 className={styles.sectionTitle}>Notifications</h3>
-                            <div className={styles.preferencesList}>
-                                <div className={styles.preferenceItem}>
-                                    <div className={styles.preferenceInfo}>
-                                        <strong>Email Notifications</strong>
-                                        <p>Receive appointment reminders via email</p>
-                                    </div>
-                                    <label className={styles.toggle}>
-                                        <input type="checkbox" defaultChecked />
-                                        <span className={styles.slider}></span>
-                                    </label>
-                                </div>
-
-                                <div className={styles.preferenceItem}>
-                                    <div className={styles.preferenceInfo}>
-                                        <strong>SMS Notifications</strong>
-                                        <p>Get text alerts for upcoming appointments</p>
-                                    </div>
-                                    <label className={styles.toggle}>
-                                        <input type="checkbox" defaultChecked />
-                                        <span className={styles.slider}></span>
-                                    </label>
-                                </div>
-
-                                <div className={styles.preferenceItem}>
-                                    <div className={styles.preferenceInfo}>
-                                        <strong>Billing Updates</strong>
-                                        <p>Notifications about bills and payments</p>
-                                    </div>
-                                    <label className={styles.toggle}>
-                                        <input type="checkbox" defaultChecked />
-                                        <span className={styles.slider}></span>
-                                    </label>
-                                </div>
-
-                                <div className={styles.preferenceItem}>
-                                    <div className={styles.preferenceInfo}>
-                                        <strong>Health Record Updates</strong>
-                                        <p>Alerts when new records are added</p>
-                                    </div>
-                                    <label className={styles.toggle}>
-                                        <input type="checkbox" />
-                                        <span className={styles.slider}></span>
-                                    </label>
-                                </div>
-                            </div>
-                        </section>
-
-                        <section className={styles.section}>
-                            <h3 className={styles.sectionTitle}>Language & Region</h3>
-                            <div className={styles.formGrid}>
-                                <div className={styles.formField}>
-                                    <label>Language</label>
-                                    <select>
-                                        <option value="en">English</option>
-                                        <option value="si">Sinhala</option>
-                                        <option value="ta">Tamil</option>
-                                    </select>
-                                </div>
-
-                                <div className={styles.formField}>
-                                    <label>Time Zone</label>
-                                    <select>
-                                        <option value="Asia/Colombo">Asia/Colombo (GMT+5:30)</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </section>
-
-                        <section className={styles.section}>
-                            <h3 className={styles.sectionTitle}>Privacy</h3>
-                            <div className={styles.privacyOptions}>
-                                <button className={styles.privacyBtn}>Download My Data</button>
-                                <button className={`${styles.privacyBtn} ${styles.dangerBtn}`}>Delete Account</button>
                             </div>
                         </section>
                     </div>

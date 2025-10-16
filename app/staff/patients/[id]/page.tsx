@@ -6,11 +6,12 @@ import { Patient, HealthRecord, Appointment, Payment } from "@/lib/types";
 import styles from "./page.module.css";
 
 interface PatientDetailProps {
-    params: { id: string };
+    params: Promise<{ id: string }>;
 }
 
 export default function PatientDetailPage({ params }: PatientDetailProps) {
     const router = useRouter();
+    const [patientId, setPatientId] = useState<string>("");
     const [patient, setPatient] = useState<Patient | null>(null);
     const [healthRecord, setHealthRecord] = useState<HealthRecord | null>(null);
     const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -20,8 +21,18 @@ export default function PatientDetailPage({ params }: PatientDetailProps) {
     const [activeTab, setActiveTab] = useState<"info" | "health" | "appointments" | "billing">("info");
 
     useEffect(() => {
-        fetchPatientData();
-    }, [params.id]);
+        const unwrapParams = async () => {
+            const { id } = await params;
+            setPatientId(id);
+        };
+        unwrapParams();
+    }, [params]);
+
+    useEffect(() => {
+        if (patientId) {
+            fetchPatientData();
+        }
+    }, [patientId]);
 
     const fetchPatientData = async () => {
         try {
@@ -29,28 +40,28 @@ export default function PatientDetailPage({ params }: PatientDetailProps) {
             setError(null);
 
             // Fetch patient info
-            const patientRes = await fetch(`/api/patients/${params.id}`);
+            const patientRes = await fetch(`/api/patients/${patientId}`);
             if (!patientRes.ok) throw new Error("Failed to fetch patient");
             const patientData = await patientRes.json();
             if (!patientData.success) throw new Error(patientData.error);
             setPatient(patientData.data);
 
             // Fetch health record
-            const healthRes = await fetch(`/api/patients/${params.id}/health-record`);
+            const healthRes = await fetch(`/api/patients/${patientId}/health-record`);
             if (healthRes.ok) {
                 const healthData = await healthRes.json();
                 if (healthData.success) setHealthRecord(healthData.data);
             }
 
             // Fetch appointments
-            const appointmentsRes = await fetch(`/api/appointments?patientId=${params.id}`);
+            const appointmentsRes = await fetch(`/api/appointments?patientId=${patientId}`);
             if (appointmentsRes.ok) {
                 const appointmentsData = await appointmentsRes.json();
                 if (appointmentsData.success) setAppointments(appointmentsData.data);
             }
 
             // Fetch payments
-            const paymentsRes = await fetch(`/api/billing?patientId=${params.id}`);
+            const paymentsRes = await fetch(`/api/billing?patientId=${patientId}`);
             if (paymentsRes.ok) {
                 const paymentsData = await paymentsRes.json();
                 if (paymentsData.success) setPayments(paymentsData.data);

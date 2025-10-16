@@ -149,6 +149,8 @@ export interface InsurancePolicy {
     startDate: Timestamp;
     endDate: Timestamp;
     status: "Active" | "Expired" | "Suspended";
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
 }
 
 export interface InsuranceClaim {

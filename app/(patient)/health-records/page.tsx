@@ -4,6 +4,15 @@ import React, { useState, useEffect } from "react";
 import { StatCard } from "@/components/StatCard";
 import { SearchBar } from "@/components/SearchBar";
 import styles from "./health-records.module.css";
+import { useAuth } from "@/lib/contexts/AuthContext";
+import { useRouter } from "next/navigation";
+import { HealthRecordRepository } from "@/lib/firestore/repositories/HealthRecordRepository";
+import { HealthRecordService } from "@/lib/services/HealthRecordService";
+import { HealthRecord, Encounter } from "@/lib/types";
+
+// Initialize services at module level
+const healthRecordRepo = new HealthRecordRepository();
+const healthRecordService = new HealthRecordService(healthRecordRepo);
 
 interface VitalSigns {
     bloodPressure: string;
@@ -11,15 +20,6 @@ interface VitalSigns {
     temperature: number;
     weight: number;
     height: number;
-}
-
-interface Encounter {
-    id: string;
-    date: string;
-    doctor: string;
-    department: string;
-    diagnosis: string;
-    notes: string;
 }
 
 interface Medication {
@@ -41,11 +41,16 @@ interface LabResult {
 }
 
 export default function PatientHealthRecords() {
+    const { user, loading: authLoading, userData } = useAuth();
+    const router = useRouter();
+
     const [activeTab, setActiveTab] = useState<"overview" | "encounters" | "medications" | "labs">("overview");
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [healthRecord, setHealthRecord] = useState<HealthRecord | null>(null);
 
-    // Mock data
+    // Mock data for vitals (not in HealthRecord type yet)
     const [vitalSigns] = useState<VitalSigns>({
         bloodPressure: "120/80",
         heartRate: 72,
@@ -54,84 +59,70 @@ export default function PatientHealthRecords() {
         height: 170,
     });
 
-    const [encounters] = useState<Encounter[]>([
-        {
-            id: "1",
-            date: "2024-12-15",
-            doctor: "Dr. Sarah Johnson",
-            department: "Cardiology",
-            diagnosis: "Routine checkup - Normal",
-            notes: "Patient is in good health. Continue current lifestyle and medications.",
-        },
-        {
-            id: "2",
-            date: "2024-11-20",
-            doctor: "Dr. Michael Chen",
-            department: "General Medicine",
-            diagnosis: "Seasonal allergies",
-            notes: "Prescribed antihistamines. Follow-up in 2 weeks if symptoms persist.",
-        },
-    ]);
-
-    const [medications] = useState<Medication[]>([
-        {
-            name: "Lisinopril",
-            dosage: "10mg",
-            frequency: "Once daily",
-            startDate: "2024-01-15",
-            status: "Active",
-        },
-        {
-            name: "Aspirin",
-            dosage: "81mg",
-            frequency: "Once daily",
-            startDate: "2024-01-15",
-            status: "Active",
-        },
-        {
-            name: "Amoxicillin",
-            dosage: "500mg",
-            frequency: "Three times daily",
-            startDate: "2024-11-20",
-            endDate: "2024-11-27",
-            status: "Completed",
-        },
-    ]);
-
-    const [labResults] = useState<LabResult[]>([
-        {
-            id: "1",
-            testName: "Complete Blood Count (CBC)",
-            date: "2024-12-10",
-            result: "Normal",
-            normalRange: "4.5-11.0 K/uL",
-            status: "Normal",
-        },
-        {
-            id: "2",
-            testName: "Lipid Panel",
-            date: "2024-12-10",
-            result: "Total Cholesterol: 180 mg/dL",
-            normalRange: "<200 mg/dL",
-            status: "Normal",
-        },
-        {
-            id: "3",
-            testName: "Blood Glucose",
-            date: "2024-12-10",
-            result: "95 mg/dL",
-            normalRange: "70-100 mg/dL",
-            status: "Normal",
-        },
-    ]);
+    // Helper function to convert doctor IDs to names
+    const getDoctorName = (doctorId: string) => {
+        const doctors: Record<string, string> = {
+            "doc-sarah": "Dr. Sarah Johnson",
+            "doc-michael": "Dr. Michael Chen",
+            "doc-emily": "Dr. Emily Williams",
+        };
+        return doctors[doctorId] || doctorId;
+    };
 
     useEffect(() => {
-        // TODO: Replace with actual API call
-        setTimeout(() => setLoading(false), 500);
-    }, []);
+        // Redirect if not authenticated
+        if (!authLoading && !user) {
+            router.push("/login");
+            return;
+        }
 
-    const formatDate = (dateStr: string) => {
-        return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+        // Fetch health records when user is available
+        if (user && userData) {
+            fetchHealthRecords();
+        }
+    }, [user, userData, authLoading, router]);
+
+    const fetchHealthRecords = async () => {
+        if (!user) return;
+
+        try {
+            setLoading(true);
+            setError(null);
+
+            // Try to get existing health record
+            let record = await healthRecordService.getHealthRecordByPatientId(user.uid).catch(async (err) => {
+                // If health record doesn't exist, create one automatically
+                if (err.message === "Health record not found for patient") {
+                    console.log("Creating initial health record for patient...");
+                    const newRecord = await healthRecordRepo.create({
+                        patientId: user.uid,
+                        bloodType: "",
+                        allergies: [],
+                        chronicConditions: [],
+                        encounters: [],
+                    });
+                    return healthRecordService.getHealthRecord(newRecord);
+                }
+                throw err; // Re-throw if it's a different error
+            });
+
+            setHealthRecord(record);
+        } catch (err) {
+            console.error("Error fetching health records:", err);
+            setError("Failed to load health records. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const formatDate = (dateStr: string | Date) => {
+        const date = typeof dateStr === "string" ? new Date(dateStr) : dateStr;
+        return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    };
+
+    const formatTimestamp = (ts: any) => {
+        const date = ts.toDate ? ts.toDate() : new Date(ts);
+        return formatDate(date);
     };
 
     const getLabStatusClass = (status: string) => {
@@ -140,28 +131,105 @@ export default function PatientHealthRecords() {
 
     const handleSearch = (query?: string) => {
         console.log("Searching:", query);
-        // TODO: Implement search functionality
     };
+
+    const handleDownloadRecords = () => {
+        if (!healthRecord) return;
+
+        // Create a simple text summary of health records
+        const recordsSummary = `
+HEALTH RECORDS SUMMARY
+========================
+
+Patient: ${userData?.firstName} ${userData?.lastName}
+Date Generated: ${new Date().toLocaleDateString()}
+
+BASIC INFORMATION
+-----------------
+Blood Type: ${healthRecord.bloodType}
+
+Allergies: ${healthRecord.allergies.length > 0 ? healthRecord.allergies.join(", ") : "None"}
+
+Chronic Conditions: ${healthRecord.chronicConditions.length > 0 ? healthRecord.chronicConditions.join(", ") : "None"}
+
+ENCOUNTERS (${healthRecord.encounters.length})
+-----------------
+${healthRecord.encounters
+    .map(
+        (e, i) => `
+${i + 1}. Date: ${formatTimestamp(e.date)}
+   Doctor: ${getDoctorName(e.doctorId)}
+   Diagnosis: ${e.diagnosis}
+   Notes: ${e.medicalNotes || "N/A"}
+   Lab Results: ${e.labResults.length > 0 ? e.labResults.join(", ") : "None"}
+`
+    )
+    .join("\n")}
+========================
+        `.trim();
+
+        // Create a blob and download it
+        const blob = new Blob([recordsSummary], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `health-records-${new Date().toISOString().split("T")[0]}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
+    // Prepare data for display
+    const encounters: Encounter[] = healthRecord?.encounters || [];
+
+    // Note: Medications and lab results are not in the current HealthRecord type
+    // This would need to be added to the data model or fetched separately
+    const medications: Medication[] = [];
+    const labResults: LabResult[] = [];
 
     // Filter data based on search
     const filteredEncounters = encounters.filter(
-        (e) =>
+        (e: Encounter) =>
             !searchQuery ||
-            e.doctor.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            e.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            e.diagnosis.toLowerCase().includes(searchQuery.toLowerCase())
+            getDoctorName(e.doctorId).toLowerCase().includes(searchQuery.toLowerCase()) ||
+            e.diagnosis.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            e.medicalNotes.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const filteredMedications = medications.filter((m) => !searchQuery || m.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    const filteredMedications = medications.filter((m: Medication) => !searchQuery || m.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    const filteredLabResults = labResults.filter((l) => !searchQuery || l.testName.toLowerCase().includes(searchQuery.toLowerCase()));
+    const filteredLabResults = labResults.filter((l: LabResult) => !searchQuery || l.testName.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    if (loading) {
+    if (loading || authLoading) {
         return (
             <div className={styles.container}>
                 <div className={styles.loading}>
                     <div className={styles.spinner}></div>
                     <p>Loading health records...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className={styles.container}>
+                <div className={styles.error}>
+                    <p>{error}</p>
+                    <button onClick={fetchHealthRecords} className={styles.retryBtn}>
+                        Retry
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (!healthRecord) {
+        return (
+            <div className={styles.container}>
+                <div className={styles.emptyState}>
+                    <p>No health records found</p>
                 </div>
             </div>
         );
@@ -192,7 +260,9 @@ export default function PatientHealthRecords() {
             </div>
 
             {/* Download Button */}
-            <button className={styles.downloadBtn}>📥 Download Records</button>
+            <button className={styles.downloadBtn} onClick={handleDownloadRecords}>
+                📥 Download Records
+            </button>
 
             {/* Tabs */}
             <div className={styles.tabs}>
@@ -216,6 +286,38 @@ export default function PatientHealthRecords() {
             {/* Overview Tab */}
             {activeTab === "overview" && (
                 <div className={styles.content}>
+                    {/* Health Profile */}
+                    <section className={styles.section}>
+                        <h2 className={styles.sectionTitle}>Health Profile</h2>
+                        <div className={styles.profileGrid}>
+                            <div className={styles.profileCard}>
+                                <div className={styles.profileIcon}>🩸</div>
+                                <div className={styles.profileInfo}>
+                                    <span className={styles.profileLabel}>Blood Type</span>
+                                    <span className={styles.profileValue}>{healthRecord.bloodType || "Not specified"}</span>
+                                </div>
+                            </div>
+                            <div className={styles.profileCard}>
+                                <div className={styles.profileIcon}>⚠️</div>
+                                <div className={styles.profileInfo}>
+                                    <span className={styles.profileLabel}>Allergies</span>
+                                    <span className={styles.profileValue}>
+                                        {healthRecord.allergies.length > 0 ? healthRecord.allergies.join(", ") : "None"}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className={styles.profileCard}>
+                                <div className={styles.profileIcon}>🏥</div>
+                                <div className={styles.profileInfo}>
+                                    <span className={styles.profileLabel}>Chronic Conditions</span>
+                                    <span className={styles.profileValue}>
+                                        {healthRecord.chronicConditions.length > 0 ? healthRecord.chronicConditions.join(", ") : "None"}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
                     {/* Vital Signs */}
                     <section className={styles.section}>
                         <h2 className={styles.sectionTitle}>Latest Vital Signs</h2>
@@ -258,35 +360,53 @@ export default function PatientHealthRecords() {
                     {/* Active Medications */}
                     <section className={styles.section}>
                         <h2 className={styles.sectionTitle}>Active Medications</h2>
-                        <div className={styles.medicationsList}>
-                            {medications
-                                .filter((med) => med.status === "Active")
-                                .map((med, index) => (
-                                    <div key={index} className={styles.medicationItem}>
-                                        <div>
-                                            <strong>{med.name}</strong> - {med.dosage}
+                        {medications.filter((med) => med.status === "Active").length > 0 ? (
+                            <div className={styles.medicationsList}>
+                                {medications
+                                    .filter((med) => med.status === "Active")
+                                    .map((med, index) => (
+                                        <div key={index} className={styles.medicationItem}>
+                                            <div>
+                                                <strong>{med.name}</strong> - {med.dosage}
+                                            </div>
+                                            <div className={styles.medicationFrequency}>{med.frequency}</div>
                                         </div>
-                                        <div className={styles.medicationFrequency}>{med.frequency}</div>
-                                    </div>
-                                ))}
-                        </div>
+                                    ))}
+                            </div>
+                        ) : (
+                            <div className={styles.emptyMessage}>
+                                <p>💊 No active medications recorded</p>
+                            </div>
+                        )}
                     </section>
 
                     {/* Recent Encounters */}
                     <section className={styles.section}>
                         <h2 className={styles.sectionTitle}>Recent Visits</h2>
-                        <div className={styles.encountersList}>
-                            {filteredEncounters.slice(0, 3).map((encounter) => (
-                                <div key={encounter.id} className={styles.encounterItem}>
-                                    <div className={styles.encounterHeader}>
-                                        <span className={styles.encounterDate}>{formatDate(encounter.date)}</span>
-                                        <span className={styles.encounterDepartment}>{encounter.department}</span>
+                        {filteredEncounters.length > 0 ? (
+                            <div className={styles.encountersList}>
+                                {filteredEncounters.slice(0, 3).map((encounter: Encounter) => (
+                                    <div key={encounter.encounterId} className={styles.encounterItem}>
+                                        <div className={styles.encounterHeader}>
+                                            <span className={styles.encounterDate}>{formatTimestamp(encounter.date)}</span>
+                                            <span className={styles.encounterDoctor}>{getDoctorName(encounter.doctorId)}</span>
+                                        </div>
+                                        <div className={styles.encounterDiagnosis}>
+                                            <strong>Diagnosis:</strong> {encounter.diagnosis}
+                                        </div>
+                                        {encounter.medicalNotes && (
+                                            <div className={styles.encounterNotes}>
+                                                <strong>Notes:</strong> {encounter.medicalNotes}
+                                            </div>
+                                        )}
                                     </div>
-                                    <div className={styles.encounterDoctor}>{encounter.doctor}</div>
-                                    <div className={styles.encounterDiagnosis}>{encounter.diagnosis}</div>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className={styles.emptyMessage}>
+                                <p>🏥 No recent visits recorded</p>
+                            </div>
+                        )}
                     </section>
                 </div>
             )}
@@ -294,120 +414,161 @@ export default function PatientHealthRecords() {
             {/* Encounters Tab */}
             {activeTab === "encounters" && (
                 <div className={styles.content}>
-                    <div className={styles.encountersGrid}>
-                        {filteredEncounters.map((encounter) => (
-                            <div key={encounter.id} className={styles.encounterCard}>
-                                <div className={styles.cardHeader}>
-                                    <div>
-                                        <div className={styles.encounterDate}>{formatDate(encounter.date)}</div>
-                                        <div className={styles.encounterDoctor}>{encounter.doctor}</div>
-                                        <div className={styles.encounterDepartment}>{encounter.department}</div>
+                    {filteredEncounters.length > 0 ? (
+                        <div className={styles.encountersGrid}>
+                            {filteredEncounters.map((encounter: Encounter) => (
+                                <div key={encounter.encounterId} className={styles.encounterCard}>
+                                    <div className={styles.cardHeader}>
+                                        <div>
+                                            <div className={styles.encounterDate}>📅 {formatTimestamp(encounter.date)}</div>
+                                            <div className={styles.encounterDoctor}>👨‍⚕️ {getDoctorName(encounter.doctorId)}</div>
+                                        </div>
+                                    </div>
+                                    <div className={styles.cardBody}>
+                                        <div className={styles.field}>
+                                            <strong>Diagnosis:</strong>
+                                            <p>{encounter.diagnosis}</p>
+                                        </div>
+                                        {encounter.medicalNotes && (
+                                            <div className={styles.field}>
+                                                <strong>Medical Notes:</strong>
+                                                <p>{encounter.medicalNotes}</p>
+                                            </div>
+                                        )}
+                                        {encounter.labResults && encounter.labResults.length > 0 && (
+                                            <div className={styles.field}>
+                                                <strong>Lab Results:</strong>
+                                                <ul className={styles.labResultsList}>
+                                                    {encounter.labResults.map((result: string, idx: number) => (
+                                                        <li key={idx}>🔬 {result}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
-                                <div className={styles.cardBody}>
-                                    <div className={styles.field}>
-                                        <strong>Diagnosis:</strong>
-                                        <p>{encounter.diagnosis}</p>
-                                    </div>
-                                    <div className={styles.field}>
-                                        <strong>Notes:</strong>
-                                        <p>{encounter.notes}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className={styles.emptyState}>
+                            <div className={styles.emptyIcon}>🏥</div>
+                            <h3>No encounters found</h3>
+                            <p>{searchQuery ? "Try adjusting your search query" : "No medical encounters recorded yet"}</p>
+                        </div>
+                    )}
                 </div>
             )}
 
             {/* Medications Tab */}
             {activeTab === "medications" && (
                 <div className={styles.content}>
-                    <div className={styles.medicationCards}>
-                        {filteredMedications.map((med, index) => (
-                            <div key={index} className={styles.medicationCard}>
-                                <div className={styles.medHeader}>
-                                    <h3 className={styles.medName}>{med.name}</h3>
-                                    <span className={`${styles.statusBadge} ${styles[med.status.toLowerCase()]}`}>{med.status}</span>
-                                </div>
-                                <div className={styles.medDetails}>
-                                    <div className={styles.medRow}>
-                                        <span className={styles.medLabel}>Dosage:</span>
-                                        <span className={styles.medValue}>{med.dosage}</span>
-                                    </div>
-                                    <div className={styles.medRow}>
-                                        <span className={styles.medLabel}>Frequency:</span>
-                                        <span className={styles.medValue}>{med.frequency}</span>
-                                    </div>
-                                    <div className={styles.medRow}>
-                                        <span className={styles.medLabel}>Start Date:</span>
-                                        <span className={styles.medValue}>{formatDate(med.startDate)}</span>
-                                    </div>
-                                    {med.endDate && (
-                                        <div className={styles.medRow}>
-                                            <span className={styles.medLabel}>End Date:</span>
-                                            <span className={styles.medValue}>{formatDate(med.endDate)}</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Old table view hidden on mobile, shown on desktop */}
-                    <div className={styles.medicationsTable}>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Medication</th>
-                                    <th>Dosage</th>
-                                    <th>Frequency</th>
-                                    <th>Start Date</th>
-                                    <th>End Date</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
+                    {filteredMedications.length > 0 ? (
+                        <>
+                            <div className={styles.medicationCards}>
                                 {filteredMedications.map((med, index) => (
-                                    <tr key={index}>
-                                        <td>{med.name}</td>
-                                        <td>{med.dosage}</td>
-                                        <td>{med.frequency}</td>
-                                        <td>{formatDate(med.startDate)}</td>
-                                        <td>{med.endDate ? formatDate(med.endDate) : "Ongoing"}</td>
-                                        <td>
+                                    <div key={index} className={styles.medicationCard}>
+                                        <div className={styles.medHeader}>
+                                            <h3 className={styles.medName}>{med.name}</h3>
                                             <span className={`${styles.statusBadge} ${styles[med.status.toLowerCase()]}`}>{med.status}</span>
-                                        </td>
-                                    </tr>
+                                        </div>
+                                        <div className={styles.medDetails}>
+                                            <div className={styles.medRow}>
+                                                <span className={styles.medLabel}>Dosage:</span>
+                                                <span className={styles.medValue}>{med.dosage}</span>
+                                            </div>
+                                            <div className={styles.medRow}>
+                                                <span className={styles.medLabel}>Frequency:</span>
+                                                <span className={styles.medValue}>{med.frequency}</span>
+                                            </div>
+                                            <div className={styles.medRow}>
+                                                <span className={styles.medLabel}>Start Date:</span>
+                                                <span className={styles.medValue}>{formatDate(med.startDate)}</span>
+                                            </div>
+                                            {med.endDate && (
+                                                <div className={styles.medRow}>
+                                                    <span className={styles.medLabel}>End Date:</span>
+                                                    <span className={styles.medValue}>{formatDate(med.endDate)}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 ))}
-                            </tbody>
-                        </table>
-                    </div>
+                            </div>
+
+                            {/* Old table view hidden on mobile, shown on desktop */}
+                            <div className={styles.medicationsTable}>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Medication</th>
+                                            <th>Dosage</th>
+                                            <th>Frequency</th>
+                                            <th>Start Date</th>
+                                            <th>End Date</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredMedications.map((med, index) => (
+                                            <tr key={index}>
+                                                <td>{med.name}</td>
+                                                <td>{med.dosage}</td>
+                                                <td>{med.frequency}</td>
+                                                <td>{formatDate(med.startDate)}</td>
+                                                <td>{med.endDate ? formatDate(med.endDate) : "Ongoing"}</td>
+                                                <td>
+                                                    <span className={`${styles.statusBadge} ${styles[med.status.toLowerCase()]}`}>{med.status}</span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
+                    ) : (
+                        <div className={styles.emptyState}>
+                            <div className={styles.emptyIcon}>💊</div>
+                            <h3>No medications found</h3>
+                            <p>{searchQuery ? "Try adjusting your search query" : "Medication records are not currently tracked in the system"}</p>
+                        </div>
+                    )}
                 </div>
             )}
 
             {/* Lab Results Tab */}
             {activeTab === "labs" && (
                 <div className={styles.content}>
-                    <div className={styles.labsGrid}>
-                        {filteredLabResults.map((lab) => (
-                            <div key={lab.id} className={styles.labCard}>
-                                <div className={styles.labHeader}>
-                                    <h3>{lab.testName}</h3>
-                                    <span className={`${styles.labStatus} ${getLabStatusClass(lab.status)}`}>{lab.status}</span>
-                                </div>
-                                <div className={styles.labBody}>
-                                    <div className={styles.labDate}>📅 {formatDate(lab.date)}</div>
-                                    <div className={styles.labResult}>
-                                        <strong>Result:</strong> {lab.result}
+                    {filteredLabResults.length > 0 ? (
+                        <div className={styles.labsGrid}>
+                            {filteredLabResults.map((lab) => (
+                                <div key={lab.id} className={styles.labCard}>
+                                    <div className={styles.labHeader}>
+                                        <h3>{lab.testName}</h3>
+                                        <span className={`${styles.labStatus} ${getLabStatusClass(lab.status)}`}>{lab.status}</span>
                                     </div>
-                                    <div className={styles.labRange}>
-                                        <strong>Normal Range:</strong> {lab.normalRange}
+                                    <div className={styles.labBody}>
+                                        <div className={styles.labDate}>📅 {formatDate(lab.date)}</div>
+                                        <div className={styles.labResult}>
+                                            <strong>Result:</strong> {lab.result}
+                                        </div>
+                                        <div className={styles.labRange}>
+                                            <strong>Normal Range:</strong> {lab.normalRange}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className={styles.emptyState}>
+                            <div className={styles.emptyIcon}>🔬</div>
+                            <h3>No lab results found</h3>
+                            <p>
+                                {searchQuery
+                                    ? "Try adjusting your search query"
+                                    : "Lab results are stored within encounter records. Check the Encounters tab for detailed lab results."}
+                            </p>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
