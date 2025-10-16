@@ -177,12 +177,20 @@ Reference: [Next.js Route Groups Docs](https://nextjs.org/docs/app/building-your
 
 **ALL styles MUST use CSS custom properties from `styles/variables.css` (100+ tokens). Never hardcode values.**
 
-**Import at page/component level:**
+**⚠️ CRITICAL CSS Module Rule:**
 
 ```css
-/* Import in every CSS module */
-@import "@/styles/variables.css";
+/* ❌ NEVER import variables.css in CSS modules - causes "not pure" error */
+@import "@/styles/variables.css"; // DON'T DO THIS
+
+/* ✅ Variables are globally available via styles/global.css */
+.container {
+    padding: var(--space-lg); /* Just use them directly */
+    background: var(--bg-light);
+}
 ```
+
+**Why:** CSS Modules don't allow global `:root` selectors. `variables.css` is imported in `styles/global.css`, making all tokens globally available.
 
 **Color Palette (Soft & Clean):**
 
@@ -559,6 +567,258 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0
 
 ---
 
+---
+
+## 💊 Medications Management Pattern
+
+### Backend Architecture (Type → Repository → Service)
+
+**1. Type Definition** (`lib/types/index.ts`):
+
+```typescript
+interface Medication {
+    medicationId: string; // Auto-generated: MED{timestamp}{random}
+    name: string;
+    dosage: string; // e.g., "500mg"
+    frequency: string; // e.g., "Twice daily"
+    startDate: Timestamp;
+    endDate?: Timestamp;
+    status: "Active" | "Completed" | "Discontinued";
+    prescribedBy: string; // doctorId
+    notes?: string;
+}
+
+// HealthRecord includes medications array
+interface HealthRecord {
+    medications: Medication[]; // Auto-initialized as []
+    encounters: Encounter[];
+    // ... other fields
+}
+```
+
+**2. Repository Layer** (`lib/firestore/repositories/HealthRecordRepository.ts`):
+
+```typescript
+// ✅ Use arrayUnion for atomic append (prevents race conditions)
+async addMedication(id: string, medication: Medication): Promise<void> {
+    const ref = doc(db, "healthRecords", id);
+    await updateDoc(ref, {
+        medications: arrayUnion(medication),
+        updatedAt: Timestamp.now()
+    });
+}
+
+// ✅ Update specific medication in array
+async updateMedication(id: string, medicationId: string, updates: Partial<Medication>): Promise<void> {
+    const record = await this.findById(id);
+    const medications = record.medications.map(med =>
+        med.medicationId === medicationId ? { ...med, ...updates } : med
+    );
+    await updateDoc(doc(db, "healthRecords", id), { medications, updatedAt: Timestamp.now() });
+}
+```
+
+**3. Service Layer** (`lib/services/HealthRecordService.ts`):
+
+```typescript
+// ✅ Auto-generate medicationId to ensure uniqueness
+async addMedication(patientId: string, medication: Omit<Medication, "medicationId">): Promise<Medication> {
+    const medicationId = `MED${Date.now()}${Math.random().toString(36).substr(2, 9)}`;
+    const fullMedication = { ...medication, medicationId };
+
+    const record = await this.getHealthRecordByPatientId(patientId);
+    await this.healthRecordRepository.addMedication(record.id, fullMedication);
+
+    return fullMedication;
+}
+
+// ✅ Status transitions with automatic endDate
+async updateMedicationStatus(patientId: string, medicationId: string, status: string, endDate?: Timestamp): Promise<void> {
+    const record = await this.getHealthRecordByPatientId(patientId);
+    const updates = { status, ...(endDate && { endDate }) };
+    await this.healthRecordRepository.updateMedication(record.id, medicationId, updates);
+}
+```
+
+### Frontend Patterns
+
+**4. Staff Portal - Modal-Based CRUD** (`app/staff/patient-records/page.tsx`):
+
+```typescript
+// ✅ Add Medication Modal with full form validation
+const [showAddMedModal, setShowAddMedModal] = useState(false);
+const [newMed, setNewMed] = useState({
+    name: "",
+    dosage: "",
+    frequency: "",
+    startDate: "", // ISO string from <input type="date">
+    endDate: "",
+    status: "Active",
+    prescribedBy: "", // Doctor ID
+    notes: "",
+});
+
+const handleAddMedication = async () => {
+    if (!newMed.name || !newMed.dosage || !newMed.frequency || !newMed.startDate || !newMed.prescribedBy) {
+        alert("Please fill in all required fields");
+        return;
+    }
+
+    // ✅ Convert ISO strings to Firestore Timestamps
+    const medToAdd = {
+        ...newMed,
+        startDate: Timestamp.fromDate(new Date(newMed.startDate)),
+        endDate: newMed.endDate ? Timestamp.fromDate(new Date(newMed.endDate)) : undefined,
+    };
+
+    await fetch(`/api/health-records/${selectedPatient.id}/medications`, {
+        method: "POST",
+        body: JSON.stringify(medToAdd),
+    });
+};
+```
+
+**5. Status Badge Pattern** (`app/staff/patient-records/page.module.css`):
+
+```css
+.statusBadge {
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-full);
+    font-size: var(--text-xs);
+    font-weight: var(--font-medium);
+}
+
+.statusBadge.active {
+    background: var(--primary-green);
+    color: var(--text-dark);
+}
+
+.statusBadge.completed {
+    background: var(--primary-blue);
+    color: var(--text-dark);
+}
+
+.statusBadge.discontinued {
+    background: var(--status-cancelled);
+    color: var(--text-dark);
+}
+```
+
+**6. Patient Portal - Responsive Display** (`app/(patient)/health-records/page.tsx`):
+
+```typescript
+// ✅ Card view for mobile, table for desktop
+<div className={styles.medicationsTab}>
+    {/* Mobile: Card view */}
+    <div className={styles.medicationCards}>
+        {medications.map((med) => (
+            <div key={med.medicationId} className={styles.medicationCard}>
+                <h3>{med.name}</h3>
+                <p>Dosage: {med.dosage}</p>
+                <p>Frequency: {med.frequency}</p>
+                <span className={`${styles.badge} ${styles[med.status.toLowerCase()]}`}>{med.status}</span>
+            </div>
+        ))}
+    </div>
+
+    {/* Desktop: Table view */}
+    <table className={styles.medicationsTable}>{/* ... */}</table>
+</div>
+```
+
+---
+
+## 📋 Staff Patient Records Architecture
+
+**Pattern: Two-Panel Layout with Multi-Section Display**
+
+**File:** `app/staff/patient-records/page.tsx` (712 lines)
+
+### Key Components
+
+**1. Patient Selection Sidebar** (Left Panel):
+
+```typescript
+// ✅ Real-time search with debouncing
+const [searchTerm, setSearchTerm] = useState("");
+const [patients, setPatients] = useState<Patient[]>([]);
+
+useEffect(() => {
+    const fetchPatients = async () => {
+        const url = searchTerm ? `/api/patients?search=${encodeURIComponent(searchTerm)}` : "/api/patients";
+        const data = await fetch(url).then((r) => r.json());
+        setPatients(data.patients);
+    };
+    fetchPatients();
+}, [searchTerm]);
+```
+
+**2. Health Record Display** (Right Panel):
+
+```typescript
+// ✅ Auto-create missing health records
+useEffect(() => {
+    const fetchHealthRecord = async () => {
+        try {
+            const data = await fetch(`/api/health-records?patientId=${selectedPatient.id}`).then((r) => r.json());
+            setHealthRecord(data.healthRecord);
+        } catch (error) {
+            // Auto-create if missing
+            await fetch("/api/health-records", {
+                method: "POST",
+                body: JSON.stringify({ patientId: selectedPatient.id }),
+            });
+        }
+    };
+    if (selectedPatient) fetchHealthRecord();
+}, [selectedPatient]);
+```
+
+**3. Multi-Section Layout**:
+
+-   **Basic Info Section**: Blood type, allergies, chronic conditions (editable via modal)
+-   **Encounters Section**: Add new encounters with date/doctor/notes, edit existing notes
+-   **Medications Section**: Full CRUD with modals (see Medications pattern above)
+-   **Lab Results**: View/download attachments (future: add new results)
+
+**4. Modal Patterns** (Shared across all CRUD operations):
+
+```typescript
+// ✅ Consistent modal structure for all edit operations
+{
+    showUpdateBasicModal && (
+        <div className={styles.modal}>
+            <div className={styles.modalContent}>
+                <h2>Update Basic Information</h2>
+                <form onSubmit={handleUpdateBasicInfo}>
+                    <label>Blood Type</label>
+                    <select value={basicInfo.bloodType} onChange={(e) => setBasicInfo({ ...basicInfo, bloodType: e.target.value })}>
+                        <option value="">Select...</option>
+                        <option value="A+">A+</option>
+                        {/* ... */}
+                    </select>
+
+                    <div className={styles.modalActions}>
+                        <button type="button" onClick={() => setShowUpdateBasicModal(false)}>
+                            Cancel
+                        </button>
+                        <button type="submit">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+```
+
+**5. Navigation Integration**:
+
+-   **Replaced Appointments Tab**: Removed `/staff/appointments` from staff layout
+-   **New Patient Records Tab**: Added `/staff/patient-records` with 📋 icon
+-   **Dashboard Quick Action**: "Update Records" button → `/staff/patient-records`
+
+---
+
 ## ⚠️ Common Pitfalls
 
 1. **Don't instantiate services in API handlers** - do it at module level
@@ -568,27 +828,23 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0
 5. **Don't create same URL in different route groups** - `(patient)/dashboard` and `(staff)/dashboard` both resolve to `/dashboard` which causes build errors
 6. **Don't hardcode CSS values** - ALWAYS use design tokens from `styles/variables.css` (spacing, colors, shadows, typography, etc.)
 7. **Don't create markdown docs for minor changes** - only for major features/guides
+8. **Don't import variables.css in CSS modules** - causes "not pure" error; variables are globally available via global.css
 
 ---
 
 ## 📊 Project Status
 
 -   Backend: 21 API endpoints ✅
--   Patient Portal: Dashboard, Appointments, Health Records, Billing, Profile ✅
--   Staff Portal: Staff Dashboard, Patients, Staff Appointments, Staff Billing, Reports ✅
+-   Patient Portal: Dashboard, Appointments, Health Records (with Medications tab), Billing, Profile ✅
+-   Staff Portal: Staff Dashboard, Patients, Patient Records (with Medications management), Staff Billing, Reports ✅
 -   Authentication: Login, Register, Password Reset, AuthContext, Middleware ✅
 -   Testing: 93.11% coverage (105 tests) ✅
 
-**All URL conflicts resolved** - Patient and Staff portals now have unique URL paths. 5. **Don't create same URL in different route groups** - `(patient)/dashboard` and `(staff)/dashboard` both resolve to `/dashboard` which causes build errors 6. **Don't hardcode CSS values** - ALWAYS use design tokens from `styles/variables.css` (spacing, colors, shadows, typography, etc.) 7. **Don't create markdown docs for minor changes** - only for major features/guides
+**Recent Additions:**
 
----
+-   ✅ Staff Patient Records: Full health record management interface (encounters, medications, basic info)
+-   ✅ Medications Feature: Complete CRUD in staff portal, view-only in patient portal with responsive design
+-   ✅ Status Management: Active/Completed/Discontinued badges with color coding
+-   ✅ Modal-Based Editing: Consistent pattern for all staff CRUD operations
 
-## 📊 Project Status
-
--   Backend: 21 API endpoints ✅
--   Patient Portal: Dashboard, Appointments, Health Records, Billing, Profile ✅
--   Staff Portal: Staff Dashboard, Patients, Staff Appointments, Staff Billing, Reports ✅
--   Authentication: Login, Register, Password Reset, AuthContext, Middleware ✅
--   Testing: 93.11% coverage (105 tests) ✅
-
-**All URL conflicts resolved** - Patient and Staff portals now have unique URL paths.
+**All URL conflicts resolved** - Patient and Staff portals have unique URL paths. Staff Appointments removed, replaced with Patient Records.

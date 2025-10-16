@@ -1,5 +1,5 @@
 import { HealthRecordRepository } from "@/lib/firestore/repositories/HealthRecordRepository";
-import { HealthRecord, Encounter, CreateHealthRecordDTO, NotFoundError, ValidationError } from "@/lib/types";
+import { HealthRecord, Encounter, Medication, CreateHealthRecordDTO, NotFoundError, ValidationError } from "@/lib/types";
 import { Timestamp } from "firebase/firestore";
 
 export class HealthRecordService {
@@ -69,6 +69,52 @@ export class HealthRecordService {
         const updatedEncounters = record.encounters.map((enc) => (enc.encounterId === encounterId ? { ...enc, labResults } : enc));
 
         await this.healthRecordRepo.update(record.id, { encounters: updatedEncounters } as any);
+        return this.getHealthRecord(record.id);
+    }
+
+    async addMedication(patientId: string, medication: Omit<Medication, "medicationId">): Promise<HealthRecord> {
+        const record = await this.getHealthRecordByPatientId(patientId);
+
+        const newMedication: Medication = {
+            ...medication,
+            medicationId: `MED${Date.now()}${Math.random().toString(36).substr(2, 9)}`,
+        };
+
+        await this.healthRecordRepo.addMedication(record.id, newMedication);
+        return this.getHealthRecord(record.id);
+    }
+
+    async updateMedicationStatus(
+        patientId: string,
+        medicationId: string,
+        status: "Active" | "Completed" | "Discontinued",
+        endDate?: Timestamp
+    ): Promise<HealthRecord> {
+        const record = await this.getHealthRecordByPatientId(patientId);
+
+        const medication = record.medications.find((med) => med.medicationId === medicationId);
+        if (!medication) {
+            throw new NotFoundError("Medication not found");
+        }
+
+        const updates: Partial<Medication> = { status };
+        if (endDate) {
+            updates.endDate = endDate;
+        }
+
+        await this.healthRecordRepo.updateMedication(record.id, medicationId, updates);
+        return this.getHealthRecord(record.id);
+    }
+
+    async updateMedication(patientId: string, medicationId: string, updates: Partial<Omit<Medication, "medicationId">>): Promise<HealthRecord> {
+        const record = await this.getHealthRecordByPatientId(patientId);
+
+        const medication = record.medications.find((med) => med.medicationId === medicationId);
+        if (!medication) {
+            throw new NotFoundError("Medication not found");
+        }
+
+        await this.healthRecordRepo.updateMedication(record.id, medicationId, updates);
         return this.getHealthRecord(record.id);
     }
 

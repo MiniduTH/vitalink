@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { HealthRecordRepository } from "@/lib/firestore/repositories/HealthRecordRepository";
 import { HealthRecordService } from "@/lib/services/HealthRecordService";
-import { HealthRecord, Encounter } from "@/lib/types";
+import { Patient, HealthRecord, Encounter, Medication } from "@/lib/types";
 
 // Initialize services at module level
 const healthRecordRepo = new HealthRecordRepository();
@@ -20,15 +20,6 @@ interface VitalSigns {
     temperature: number;
     weight: number;
     height: number;
-}
-
-interface Medication {
-    name: string;
-    dosage: string;
-    frequency: string;
-    startDate: string;
-    endDate?: string;
-    status: "Active" | "Completed";
 }
 
 interface LabResult {
@@ -182,10 +173,10 @@ ${i + 1}. Date: ${formatTimestamp(e.date)}
 
     // Prepare data for display
     const encounters: Encounter[] = healthRecord?.encounters || [];
+    const medications: Medication[] = healthRecord?.medications || [];
 
-    // Note: Medications and lab results are not in the current HealthRecord type
+    // Note: Lab results are not in the current HealthRecord type
     // This would need to be added to the data model or fetched separately
-    const medications: Medication[] = [];
     const labResults: LabResult[] = [];
 
     // Filter data based on search
@@ -481,13 +472,23 @@ ${i + 1}. Date: ${formatTimestamp(e.date)}
                                                 <span className={styles.medValue}>{med.frequency}</span>
                                             </div>
                                             <div className={styles.medRow}>
+                                                <span className={styles.medLabel}>Prescribed By:</span>
+                                                <span className={styles.medValue}>{getDoctorName(med.prescribedBy)}</span>
+                                            </div>
+                                            <div className={styles.medRow}>
                                                 <span className={styles.medLabel}>Start Date:</span>
-                                                <span className={styles.medValue}>{formatDate(med.startDate)}</span>
+                                                <span className={styles.medValue}>{formatTimestamp(med.startDate)}</span>
                                             </div>
                                             {med.endDate && (
                                                 <div className={styles.medRow}>
                                                     <span className={styles.medLabel}>End Date:</span>
-                                                    <span className={styles.medValue}>{formatDate(med.endDate)}</span>
+                                                    <span className={styles.medValue}>{formatTimestamp(med.endDate)}</span>
+                                                </div>
+                                            )}
+                                            {med.notes && (
+                                                <div className={styles.medRow}>
+                                                    <span className={styles.medLabel}>Notes:</span>
+                                                    <span className={styles.medValue}>{med.notes}</span>
                                                 </div>
                                             )}
                                         </div>
@@ -503,6 +504,7 @@ ${i + 1}. Date: ${formatTimestamp(e.date)}
                                             <th>Medication</th>
                                             <th>Dosage</th>
                                             <th>Frequency</th>
+                                            <th>Prescribed By</th>
                                             <th>Start Date</th>
                                             <th>End Date</th>
                                             <th>Status</th>
@@ -514,8 +516,9 @@ ${i + 1}. Date: ${formatTimestamp(e.date)}
                                                 <td>{med.name}</td>
                                                 <td>{med.dosage}</td>
                                                 <td>{med.frequency}</td>
-                                                <td>{formatDate(med.startDate)}</td>
-                                                <td>{med.endDate ? formatDate(med.endDate) : "Ongoing"}</td>
+                                                <td>{getDoctorName(med.prescribedBy)}</td>
+                                                <td>{formatTimestamp(med.startDate)}</td>
+                                                <td>{med.endDate ? formatTimestamp(med.endDate) : "Ongoing"}</td>
                                                 <td>
                                                     <span className={`${styles.statusBadge} ${styles[med.status.toLowerCase()]}`}>{med.status}</span>
                                                 </td>

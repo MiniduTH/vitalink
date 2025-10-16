@@ -29,9 +29,9 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
                         <span className={styles.icon}>👥</span>
                         <span className={styles.label}>Patients</span>
                     </a>
-                    <a href="/staff/staff-appointments" className={`${styles.navLink} ${isActive("/staff/staff-appointments") ? styles.active : ""}`}>
-                        <span className={styles.icon}>📅</span>
-                        <span className={styles.label}>Appointments</span>
+                    <a href="/staff/patient-records" className={`${styles.navLink} ${isActive("/staff/patient-records") ? styles.active : ""}`}>
+                        <span className={styles.icon}>�</span>
+                        <span className={styles.label}>Patient Records</span>
                     </a>
                     <a href="/staff/staff-billing" className={`${styles.navLink} ${isActive("/staff/staff-billing") ? styles.active : ""}`}>
                         <span className={styles.icon}>💳</span>
@@ -65,12 +65,9 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
                     <span className={styles.icon}>👥</span>
                     <span className={styles.label}>Patients</span>
                 </a>
-                <a
-                    href="/staff/staff-appointments"
-                    className={`${styles.bottomNavItem} ${isActive("/staff/staff-appointments") ? styles.active : ""}`}
-                >
-                    <span className={styles.icon}>📅</span>
-                    <span className={styles.label}>Appointments</span>
+                <a href="/staff/patient-records" className={`${styles.bottomNavItem} ${isActive("/staff/patient-records") ? styles.active : ""}`}>
+                    <span className={styles.icon}>�</span>
+                    <span className={styles.label}>Records</span>
                 </a>
                 <a href="/staff/staff-billing" className={`${styles.bottomNavItem} ${isActive("/staff/staff-billing") ? styles.active : ""}`}>
                     <span className={styles.icon}>💳</span>

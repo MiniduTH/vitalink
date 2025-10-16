@@ -1,6 +1,6 @@
 import { collection, doc, getDoc, getDocs, addDoc, updateDoc, query, where, Timestamp, arrayUnion } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
-import { HealthRecord, CreateHealthRecordDTO, Encounter } from "@/lib/types";
+import { HealthRecord, CreateHealthRecordDTO, Encounter, Medication } from "@/lib/types";
 
 export class HealthRecordRepository {
     private collectionName = "healthRecords";
@@ -32,6 +32,7 @@ export class HealthRecordRepository {
         const docRef = await addDoc(collection(db, this.collectionName), {
             ...data,
             encounters: data.encounters || [],
+            medications: data.medications || [],
             createdAt: Timestamp.now(),
             updatedAt: Timestamp.now(),
         });
@@ -61,5 +62,22 @@ export class HealthRecordRepository {
         const updatedEncounters = record.encounters.map((enc) => (enc.encounterId === encounterId ? { ...enc, medicalNotes: notes } : enc));
 
         await this.update(id, { encounters: updatedEncounters } as any);
+    }
+
+    async addMedication(id: string, medication: Medication): Promise<void> {
+        const docRef = doc(db, this.collectionName, id);
+        await updateDoc(docRef, {
+            medications: arrayUnion(medication),
+            updatedAt: Timestamp.now(),
+        });
+    }
+
+    async updateMedication(id: string, medicationId: string, updates: Partial<Medication>): Promise<void> {
+        const record = await this.findById(id);
+        if (!record) throw new Error("Health record not found");
+
+        const updatedMedications = record.medications.map((med) => (med.medicationId === medicationId ? { ...med, ...updates } : med));
+
+        await this.update(id, { medications: updatedMedications } as any);
     }
 }

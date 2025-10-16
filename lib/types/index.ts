@@ -40,6 +40,7 @@ export interface HealthRecord {
     allergies: string[];
     chronicConditions: string[];
     encounters: Encounter[];
+    medications: Medication[];
     digitalHealthCardId: string;
     createdAt: Timestamp;
     updatedAt: Timestamp;
@@ -54,12 +55,25 @@ export interface Encounter {
     doctorId: string;
 }
 
+export interface Medication {
+    medicationId: string;
+    name: string;
+    dosage: string;
+    frequency: string;
+    startDate: Timestamp;
+    endDate?: Timestamp;
+    status: "Active" | "Completed" | "Discontinued";
+    prescribedBy: string; // doctorId
+    notes?: string;
+}
+
 export interface CreateHealthRecordDTO {
     patientId: string;
     bloodType: string;
     allergies: string[];
     chronicConditions: string[];
     encounters?: Encounter[];
+    medications?: Medication[];
     digitalHealthCardId?: string;
 }
 
