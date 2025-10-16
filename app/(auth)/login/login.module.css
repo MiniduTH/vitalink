@@ -1,0 +1,370 @@
+/* Mobile: 320px-768px (BASE) */
+.container {
+    width: 100%;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 0.5rem 0;
+}
+
+.subtitle {
+    font-size: 0.875rem;
+    color: #64748b;
+    margin: 0;
+}
+
+/* Error Alert */
+.errorAlert {
+    padding: 1rem;
+    background: #fee2e2;
+    border: 1px solid #fca5a5;
+    border-radius: 0.5rem;
+    color: #991b1b;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.875rem;
+}
+
+.errorIcon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+/* Success Alert */
+.successAlert {
+    padding: 1rem;
+    background: #d1fae5;
+    border: 1px solid #6ee7b7;
+    border-radius: 0.5rem;
+    color: #065f46;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.875rem;
+}
+
+.successIcon {
+    font-size: 1.25rem;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+/* Form */
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+/* User Type Selector */
+.userTypeSelector {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.userTypeBtn {
+    padding: 1rem;
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: #64748b;
+    font-size: 0.875rem;
+}
+
+.userTypeBtn:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+}
+
+.userTypeBtn.active {
+    border-color: #667eea;
+    background: #ede9fe;
+    color: #5b21b6;
+}
+
+.userTypeIcon {
+    font-size: 1.5rem;
+}
+
+/* Form Fields */
+.formField {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #475569;
+}
+
+.input {
+    padding: 0.875rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.input::placeholder {
+    color: #cbd5e1;
+}
+
+/* Password Container */
+.passwordContainer {
+    position: relative;
+}
+
+.passwordContainer .input {
+    padding-right: 3rem;
+}
+
+.passwordToggle {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.25rem;
+    padding: 0.5rem;
+    transition: opacity 0.2s;
+}
+
+.passwordToggle:hover {
+    opacity: 0.7;
+}
+
+/* Form Options */
+.formOptions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: -0.5rem;
+}
+
+.checkboxLabel {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #64748b;
+    cursor: pointer;
+}
+
+.checkbox {
+    width: 1rem;
+    height: 1rem;
+    cursor: pointer;
+}
+
+.forgotLink {
+    font-size: 0.875rem;
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s;
+}
+
+.forgotLink:hover {
+    color: #5b21b6;
+}
+
+/* Submit Button */
+.submitBtn {
+    padding: 1rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.submitBtn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px -5px rgba(102, 126, 234, 0.4);
+}
+
+.submitBtn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.submitBtn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* Spinner */
+.spinner {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Divider */
+.divider {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 0.5rem 0;
+}
+
+.dividerLine {
+    flex: 1;
+    height: 1px;
+    background: #e2e8f0;
+}
+
+.dividerText {
+    font-size: 0.875rem;
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+/* Google Button */
+.googleBtn {
+    padding: 1rem;
+    background: white;
+    color: #1e293b;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+}
+
+.googleBtn:hover:not(:disabled) {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.googleBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.googleIcon {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+/* Footer */
+.footer {
+    margin-top: 2rem;
+    text-align: center;
+}
+
+.footer p {
+    font-size: 0.875rem;
+    color: #64748b;
+    margin: 0;
+}
+
+.signUpLink {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s;
+}
+
+.signUpLink:hover {
+    color: #5b21b6;
+    text-decoration: underline;
+}
+
+/* Tablet: 768px+ */
+@media (min-width: 768px) {
+    .title {
+        font-size: 2rem;
+    }
+
+    .subtitle {
+        font-size: 1rem;
+    }
+
+    .userTypeBtn {
+        padding: 1.25rem;
+        font-size: 1rem;
+    }
+
+    .userTypeIcon {
+        font-size: 2rem;
+    }
+
+    .label {
+        font-size: 1rem;
+    }
+
+    .formOptions {
+        font-size: 1rem;
+    }
+
+    .footer p {
+        font-size: 1rem;
+    }
+}
+
+/* Desktop: 1024px+ */
+@media (min-width: 1024px) {
+    .header {
+        margin-bottom: 2.5rem;
+    }
+
+    .title {
+        font-size: 2.25rem;
+    }
+
+    .form {
+        gap: 1.5rem;
+    }
+}
