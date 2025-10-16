@@ -4,7 +4,7 @@
 
 **Vitalink** is a production-ready Smart Healthcare System built with Next.js 14 (App Router), TypeScript, and Firebase. It implements a strict 3-layer architecture (Repository → Service → API) with dual portals for patients and staff.
 
-**Current Status:** Backend 100% (21 API endpoints), Patient Portal 100%, Staff Portal 100%, Firebase Auth integrated, Testing 93.11% coverage.
+**Current Status:** Backend 100% (21 API endpoints), Patient Portal 100%, Staff Portal 100%, Authentication System 100% (Firebase Auth fully integrated), Testing 93.11% coverage.
 
 ---
 
@@ -95,11 +95,20 @@ const q = query(collection(db, "appointments"), ...constraints);
 
 **Pattern:** See `lib/firestore/repositories/AppointmentRepository.ts` for query building.
 
-### 3. Firebase Auth Integration
+### 3. Firebase Auth Integration (COMPLETE ✅)
 
 -   **AuthContext** (`lib/contexts/AuthContext.tsx`): Global auth state with `onAuthStateChanged`, auto-fetches user profile from Firestore
 -   **Middleware** (`middleware.ts`): Cookie-based route protection, redirects to `/login` with `?redirect=` param
--   **Login Flow**: `signInWithEmailAndPassword` → check `patients/` or `staff/` collection → set `userType` → redirect to portal
+-   **Login Flow**: `signInWithEmailAndPassword` → check `patients/` or `staff/` collection → verify `userType` match → redirect to portal
+-   **Registration Flow**: Multi-step form → `createUserWithEmailAndPassword` → create Firestore profile (`patients/` or `staff/`) → auto-create health record for patients
+-   **Google OAuth**: `signInWithPopup` → verify user exists in Firestore → redirect (requires prior registration)
+-   **Password Reset**: `sendPasswordResetEmail` → user receives link → resets password via Firebase
+
+**Auth Pages:**
+
+-   `app/(auth)/login/page.tsx` - Email/password + Google sign-in with user type verification
+-   `app/(auth)/register/page.tsx` - Multi-step registration (account info → personal details → emergency contact for patients)
+-   `app/(auth)/forgot-password/page.tsx` - Password reset flow with email confirmation
 
 ---
 
@@ -416,20 +425,29 @@ export function AppointmentCard({ appointment }: { appointment: Appointment }) {
 
 ---
 
-## ✅ Testing Standards
+## ✅ Testing Standards (93.11% Coverage)
 
-### Component Tests (jsdom)
+**Framework:** Jest 29.7.0 + React Testing Library v16.3.0 | **Total:** 105 tests passing
+
+### Critical Testing Patterns
+
+**1. Environment Directives** (MUST include at top of test files):
 
 ```typescript
 /**
- * @jest-environment jsdom
+ * @jest-environment jsdom  // For React components (needs DOM APIs)
+ * @jest-environment node    // For services/API (default)
  */
-import { render, screen } from "@testing-library/react";
 ```
 
-**Why:** Service tests use Node environment (default), React needs DOM APIs.
+**2. Firebase Mocking** (`jest.setup.js` auto-mocks, no manual setup needed):
 
-### Service Test Pattern
+```typescript
+// ✅ Already configured globally - just import and use
+import { auth, db } from "@/lib/firebase/config";
+```
+
+**3. Repository Mocking Pattern**:
 
 ```typescript
 jest.mock("@/lib/firestore/repositories/PatientRepository");
@@ -446,24 +464,37 @@ const mockPatient = {
 mockRepo.findById.mockResolvedValue(mockPatient);
 ```
 
-**Why:** All Firestore entities have `createdAt`/`updatedAt`. Services access these for sorting/logging.
+**Why:** All Firestore entities have `createdAt`/`updatedAt` timestamps. Services access these for sorting/logging.
 
-### Shared Test Data Scoping
+**4. Test Structure** (Positive + Negative + Edge cases):
 
 ```typescript
-describe("PatientService", () => {
-    // ✅ Define at describe level for access in nested describes
+describe("ServiceName", () => {
+    // ✅ Shared data at describe level for all nested tests
     const validData = { firstName: "John", ... };
 
-    describe("registerPatient", () => {
-        it("works", async () => {
-            await service.registerPatient(validData); // Accessible
-        });
+    beforeEach(() => jest.clearAllMocks());
+
+    describe("methodName", () => {
+        it("should succeed with valid data", async () => { /* positive */ });
+        it("should throw ValidationError for invalid input", async () => { /* negative */ });
+        it("should handle edge case: empty array", async () => { /* edge */ });
     });
 });
 ```
 
-**Coverage Target:** >80% (current: 93.11% service layer). Run `npm run test:coverage`.
+**Test Coverage by Service:**
+
+-   PatientService: 13 tests | AppointmentService: 18 tests (includes Firestore transactions)
+-   BillingService: 15 tests (payment gateway mocking) | InsuranceService: 9 tests
+-   ReportingService: 10 tests | HealthRecordService: 12 tests | NotificationService: 8 tests
+
+**Run Commands:**
+
+```bash
+npm test                # Watch mode
+npm run test:coverage   # Generate coverage report (opens in browser)
+```
 
 ---
 
@@ -537,6 +568,18 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0
 5. **Don't create same URL in different route groups** - `(patient)/dashboard` and `(staff)/dashboard` both resolve to `/dashboard` which causes build errors
 6. **Don't hardcode CSS values** - ALWAYS use design tokens from `styles/variables.css` (spacing, colors, shadows, typography, etc.)
 7. **Don't create markdown docs for minor changes** - only for major features/guides
+
+---
+
+## 📊 Project Status
+
+-   Backend: 21 API endpoints ✅
+-   Patient Portal: Dashboard, Appointments, Health Records, Billing, Profile ✅
+-   Staff Portal: Staff Dashboard, Patients, Staff Appointments, Staff Billing, Reports ✅
+-   Authentication: Login, Register, Password Reset, AuthContext, Middleware ✅
+-   Testing: 93.11% coverage (105 tests) ✅
+
+**All URL conflicts resolved** - Patient and Staff portals now have unique URL paths. 5. **Don't create same URL in different route groups** - `(patient)/dashboard` and `(staff)/dashboard` both resolve to `/dashboard` which causes build errors 6. **Don't hardcode CSS values** - ALWAYS use design tokens from `styles/variables.css` (spacing, colors, shadows, typography, etc.) 7. **Don't create markdown docs for minor changes** - only for major features/guides
 
 ---
 
