@@ -6,14 +6,202 @@
 
 /* Header */
 .header {
-    margin-bottom: var(--space-xl);
+    margin-bottom: var(--space-lg);
 }
 
 .title {
     font-size: var(--text-2xl);
     font-weight: 700;
     color: var(--text-dark);
+    margin: 0 0 var(--space-xs) 0;
+}
+
+.subtitle {
+    font-size: var(--text-sm);
+    color: var(--text-gray);
     margin: 0;
+}
+
+/* Tab Navigation */
+.tabNav {
+    display: flex;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-xl);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.tabBtn {
+    padding: var(--space-md) var(--space-lg);
+    background: white;
+    border: 2px solid var(--border-light);
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    font-size: var(--text-sm);
+    color: var(--text-dark);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    white-space: nowrap;
+    min-height: 44px;
+}
+
+.tabBtn:hover {
+    border-color: var(--accent-teal);
+    background: rgba(102, 217, 232, 0.05);
+}
+
+.tabBtn.active {
+    background: var(--accent-teal);
+    color: white;
+    border-color: var(--accent-teal);
+}
+
+.tabBtn:active {
+    transform: scale(0.98);
+}
+
+/* Dashboard Content */
+.dashboardContent {
+    animation: fadeIn 0.3s ease-in;
+}
+
+.sectionTitle {
+    font-size: var(--text-xl);
+    font-weight: 600;
+    color: var(--text-dark);
+    margin: 0 0 var(--space-lg) 0;
+}
+
+.metricsGrid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+    margin-bottom: var(--space-xl);
+}
+
+.metricCard {
+    background: white;
+    border-radius: var(--radius-xl);
+    padding: var(--space-lg);
+    box-shadow: var(--shadow-md);
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+    transition: transform var(--transition-base);
+}
+
+.metricCard:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.metricIcon {
+    font-size: 2.5rem;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-lg);
+    flex-shrink: 0;
+}
+
+.metricCard.patients .metricIcon {
+    background: var(--primary-pink);
+}
+
+.metricCard.appointments .metricIcon {
+    background: var(--primary-blue);
+}
+
+.metricCard.revenue .metricIcon {
+    background: var(--primary-green);
+}
+
+.metricCard.pending .metricIcon {
+    background: var(--status-scheduled);
+}
+
+.metricCard.today .metricIcon {
+    background: var(--accent-teal);
+}
+
+.metricCard.completion .metricIcon {
+    background: var(--status-confirmed);
+}
+
+.metricContent {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    flex: 1;
+}
+
+.metricLabel {
+    font-size: var(--text-sm);
+    color: var(--text-gray);
+    font-weight: 500;
+}
+
+.metricValue {
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.quickActions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.actionBtn {
+    padding: var(--space-lg);
+    background: var(--accent-teal);
+    color: white;
+    border: none;
+    border-radius: var(--radius-lg);
+    font-weight: 600;
+    font-size: var(--text-md);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    min-height: 44px;
+    box-shadow: var(--shadow-sm);
+}
+
+.actionBtn:hover {
+    opacity: 0.9;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.actionBtn:active {
+    transform: translateY(0) scale(0.98);
+}
+
+/* Report Content */
+.reportContent {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Loading State */
+.loading {
+    text-align: center;
+    padding: var(--space-3xl);
+    color: var(--text-gray);
+    font-size: var(--text-lg);
 }
 
 /* Configuration Card */
@@ -124,28 +312,44 @@
 
 .summaryCard {
     background: white;
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-xl);
     padding: var(--space-lg);
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-md);
     display: flex;
     flex-direction: column;
     gap: var(--space-xs);
+    transition: all var(--transition-base);
+    border-left: 4px solid var(--accent-teal);
+}
+
+.summaryCard:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.summaryCard.highlight {
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--white) 100%);
+    border-left: 4px solid #10b981;
 }
 
 .summaryLabel {
     font-size: var(--text-sm);
     color: var(--text-gray);
-    font-weight: 500;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .summaryValue {
     font-size: var(--text-2xl);
     font-weight: 700;
     color: var(--text-dark);
+    word-break: break-word;
 }
 
 .summaryValue.revenue {
     color: #10b981;
+    font-size: var(--text-3xl);
 }
 
 /* Export Actions */
@@ -184,10 +388,11 @@
 /* Table Card */
 .tableCard {
     background: white;
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-xl);
     padding: var(--space-lg);
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-md);
     margin-bottom: var(--space-xl);
+    border: 1px solid var(--border-light);
 }
 
 .tableTitle {
@@ -195,11 +400,21 @@
     font-weight: 600;
     color: var(--text-dark);
     margin: 0 0 var(--space-lg) 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.tableTitle::before {
+    content: '📋';
+    font-size: var(--text-xl);
 }
 
 .tableWrapper {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-light);
 }
 
 .table {
@@ -208,36 +423,48 @@
 }
 
 .table thead {
-    background: var(--bg-light);
+    background: linear-gradient(135deg, var(--accent-teal) 0%, var(--primary-blue) 100%);
 }
 
 .table th {
-    padding: var(--space-md);
+    padding: var(--space-md) var(--space-lg);
     text-align: left;
     font-weight: 600;
-    color: var(--text-dark);
+    color: white;
     font-size: var(--text-sm);
-    border-bottom: 2px solid var(--border-light);
+    border-bottom: none;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .table td {
-    padding: var(--space-md);
+    padding: var(--space-md) var(--space-lg);
     border-bottom: 1px solid var(--border-light);
     font-size: var(--text-sm);
     color: var(--text-dark);
+}
+
+.table tbody tr {
+    transition: background var(--transition-fast);
 }
 
 .table tbody tr:hover {
     background: var(--bg-light);
 }
 
+.table tbody tr:last-child td {
+    border-bottom: none;
+}
+
 .totalRow {
-    background: var(--primary-green);
+    background: var(--primary-green) !important;
 }
 
 .totalRow td {
     font-weight: 700;
     border-bottom: none;
+    padding: var(--space-lg);
+    font-size: var(--text-md);
 }
 
 /* Empty State */
@@ -255,10 +482,29 @@
     margin: 0;
 }
 
+/* Mobile: 480px+ */
+@media (min-width: 480px) {
+    .metricsGrid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .summaryGrid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 /* Tablet: 768px+ */
 @media (min-width: 768px) {
     .title {
         font-size: var(--text-3xl);
+    }
+
+    .subtitle {
+        font-size: var(--text-md);
+    }
+
+    .tabNav {
+        gap: var(--space-md);
     }
 
     .configRow {
@@ -269,6 +515,10 @@
         flex: 1;
     }
 
+    .metricsGrid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
     .summaryGrid {
         grid-template-columns: repeat(3, 1fr);
     }
@@ -276,11 +526,35 @@
     .exportActions {
         flex-wrap: nowrap;
     }
+
+    .quickActions {
+        flex-direction: row;
+    }
+
+    .metricValue {
+        font-size: var(--text-3xl);
+    }
 }
 
 /* Desktop: 1024px+ */
 @media (min-width: 1024px) {
+    .metricsGrid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
     .summaryGrid {
         grid-template-columns: repeat(3, 1fr);
+    }
+
+    .container {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+}
+
+/* Large: 1440px+ */
+@media (min-width: 1440px) {
+    .metricsGrid {
+        grid-template-columns: repeat(6, 1fr);
     }
 }

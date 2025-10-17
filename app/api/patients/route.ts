@@ -16,11 +16,11 @@ export async function GET(request: NextRequest) {
 
         if (search) {
             const patients = await patientService.searchPatients(search);
-            return NextResponse.json({ success: true, data: patients });
+            return NextResponse.json({ success: true, patients, data: patients });
         }
 
         const patients = await patientService.getAllPatients(limit ? parseInt(limit) : undefined);
-        return NextResponse.json({ success: true, data: patients });
+        return NextResponse.json({ success: true, patients, data: patients });
     } catch (error: any) {
         return NextResponse.json({ success: false, error: error.message }, { status: error.name === "ValidationError" ? 400 : 500 });
     }

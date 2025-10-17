@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { StatCard } from "@/components/StatCard";
 import { SearchBar } from "@/components/SearchBar";
+import { PaymentSimulator } from "@/components/PaymentSimulator";
 import styles from "./billing.module.css";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { useRouter } from "next/navigation";
@@ -126,12 +127,81 @@ export default function PatientBilling() {
         setShowPaymentModal(true);
     };
 
-    const handlePaymentSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        // TODO: Implement actual payment processing
-        alert("Payment processing would happen here. Integration with BillingService needed.");
+    const handlePaymentSuccess = async (transactionId: string, method: "Cash" | "Card") => {
+        if (!selectedBill) return;
+
+        try {
+            // Process payment through API
+            const response = await fetch("/api/billing/process-payment", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    paymentId: selectedBill.id,
+                    paymentMethod: method,
+                    cardDetails: method === "Card" ? { transactionId } : undefined,
+                }),
+            });
+
+            if (!response.ok) throw new Error("Failed to process payment");
+
+            const data = await response.json();
+            if (!data.success) throw new Error(data.error);
+
+            // Refresh billing data
+            await fetchBillingData();
+            setShowPaymentModal(false);
+            setSelectedBill(null);
+
+            alert(`Payment successful! Transaction ID: ${transactionId}`);
+        } catch (err) {
+            alert(err instanceof Error ? err.message : "Failed to process payment");
+        }
+    };
+
+    const handlePaymentCancel = () => {
         setShowPaymentModal(false);
         setSelectedBill(null);
+    };
+
+    const handleDownloadReceipt = (payment: Payment) => {
+        // Generate receipt content
+        const receiptContent = `
+        ===========================================
+                VITALINK MEDICAL CENTER
+                PAYMENT RECEIPT
+        ===========================================
+
+        Receipt #: ${payment.transactionId}
+        Date: ${payment.paidAt ? formatDate(payment.paidAt) : formatDate(payment.createdAt)}
+        Patient: ${userData ? `${userData.firstName} ${userData.lastName}` : "N/A"}
+
+        -------------------------------------------
+        PAYMENT DETAILS
+        -------------------------------------------
+        Appointment ID: ${payment.appointmentId}
+        Total Amount: ${formatCurrency(payment.amount)}
+        Insurance Coverage: ${formatCurrency(payment.insuranceCoverage)}
+        Patient Portion: ${formatCurrency(payment.patientPortion)}
+
+        Payment Method: ${payment.paymentMethod}
+        Status: ${payment.status}
+
+        -------------------------------------------
+        Thank you for your payment!
+        For inquiries, contact: support@vitalink.com
+        ===========================================
+        `.trim();
+
+        // Create a blob and download
+        const blob = new Blob([receiptContent], { type: "text/plain" });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `receipt-${payment.transactionId}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
     };
 
     const handleAddInsurance = () => {
@@ -339,13 +409,16 @@ export default function PatientBilling() {
                                 </div>
 
                                 <div className={styles.billActions}>
-                                    <button className={styles.viewBtn}>View Details</button>
                                     {bill.status === "Pending" && (
                                         <button className={styles.payBtn} onClick={() => handlePayNow(bill)}>
                                             Pay Now
                                         </button>
                                     )}
-                                    {bill.status === "Completed" && <button className={styles.receiptBtn}>Download Receipt</button>}
+                                    {bill.status === "Completed" && (
+                                        <button className={styles.receiptBtn} onClick={() => handleDownloadReceipt(bill)}>
+                                            Download Receipt
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -442,7 +515,9 @@ export default function PatientBilling() {
                                             <td>{payment.paymentMethod}</td>
                                             <td className={styles.historyAmount}>{formatCurrency(payment.amount)}</td>
                                             <td>
-                                                <button className={styles.downloadBtn}>Download</button>
+                                                <button className={styles.downloadBtn} onClick={() => handleDownloadReceipt(payment)}>
+                                                    Download
+                                                </button>
                                             </td>
                                         </tr>
                                     );
@@ -453,76 +528,37 @@ export default function PatientBilling() {
                 </div>
             )}
 
-            {/* Payment Modal */}
+            {/* Payment Modal with Simulator */}
             {showPaymentModal && selectedBill && (
                 <div className={styles.modal}>
-                    <div className={styles.modalContent}>
-                        <div className={styles.modalHeader}>
-                            <h2>Process Payment</h2>
-                            <button className={styles.closeBtn} onClick={() => setShowPaymentModal(false)}>
-                                ×
-                            </button>
-                        </div>
-
-                        <div className={styles.paymentSummary}>
-                            <div className={styles.summaryRow}>
-                                <span>Transaction ID:</span>
-                                <strong>{selectedBill.transactionId}</strong>
-                            </div>
-                            <div className={styles.summaryRow}>
-                                <span>Appointment ID:</span>
-                                <strong>{selectedBill.appointmentId}</strong>
-                            </div>
-                            <div className={styles.summaryRow}>
-                                <span>Total Amount:</span>
-                                <strong className={styles.totalAmount}>{formatCurrency(selectedBill.amount)}</strong>
-                            </div>
-                            <div className={styles.summaryRow}>
-                                <span>Insurance Coverage:</span>
-                                <strong>{formatCurrency(selectedBill.insuranceCoverage)}</strong>
-                            </div>
-                            <div className={styles.summaryRow}>
-                                <span>Your Portion:</span>
-                                <strong className={styles.totalAmount}>{formatCurrency(selectedBill.patientPortion)}</strong>
-                            </div>
-                        </div>
-
-                        <form className={styles.paymentForm} onSubmit={handlePaymentSubmit}>
-                            <div className={styles.formGroup}>
-                                <label>Payment Method</label>
-                                <select required>
-                                    <option value="">Select Method</option>
-                                    <option value="credit">Credit Card</option>
-                                    <option value="debit">Debit Card</option>
-                                    <option value="bank">Bank Transfer</option>
-                                </select>
-                            </div>
-
-                            <div className={styles.formGroup}>
-                                <label>Card Number</label>
-                                <input type="text" placeholder="1234 5678 9012 3456" maxLength={19} required />
-                            </div>
-
-                            <div className={styles.formRow}>
-                                <div className={styles.formGroup}>
-                                    <label>Expiry Date</label>
-                                    <input type="text" placeholder="MM/YY" maxLength={5} required />
+                    <div className={styles.modalContentSimulator}>
+                        <div className={styles.paymentInfo}>
+                            <h3 className={styles.infoTitle}>Bill Summary</h3>
+                            <div className={styles.infoGrid}>
+                                <div className={styles.infoRow}>
+                                    <span className={styles.infoLabel}>Transaction ID:</span>
+                                    <span className={styles.infoValue}>{selectedBill.transactionId}</span>
                                 </div>
-                                <div className={styles.formGroup}>
-                                    <label>CVV</label>
-                                    <input type="text" placeholder="123" maxLength={3} required />
+                                <div className={styles.infoRow}>
+                                    <span className={styles.infoLabel}>Appointment:</span>
+                                    <span className={styles.infoValue}>{selectedBill.appointmentId}</span>
+                                </div>
+                                <div className={styles.infoRow}>
+                                    <span className={styles.infoLabel}>Total Amount:</span>
+                                    <span className={styles.infoValue}>{formatCurrency(selectedBill.amount)}</span>
+                                </div>
+                                <div className={styles.infoRow}>
+                                    <span className={styles.infoLabel}>Insurance Coverage:</span>
+                                    <span className={styles.infoValue}>{formatCurrency(selectedBill.insuranceCoverage)}</span>
                                 </div>
                             </div>
-
-                            <div className={styles.formActions}>
-                                <button type="button" className={styles.cancelBtn} onClick={() => setShowPaymentModal(false)}>
-                                    Cancel
-                                </button>
-                                <button type="submit" className={styles.submitBtn}>
-                                    Pay {formatCurrency(selectedBill.patientPortion)}
-                                </button>
-                            </div>
-                        </form>
+                        </div>
+                        <PaymentSimulator
+                            amount={selectedBill.patientPortion}
+                            onSuccess={handlePaymentSuccess}
+                            onCancel={handlePaymentCancel}
+                            patientName={userData ? `${userData.firstName} ${userData.lastName}` : undefined}
+                        />
                     </div>
                 </div>
             )}

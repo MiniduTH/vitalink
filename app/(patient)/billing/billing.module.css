@@ -3,6 +3,14 @@
     padding: var(--space-md);
     max-width: 1400px;
     margin: 0 auto;
+    overflow-x: hidden;
+    /* Prevent horizontal scroll */
+}
+
+/* Ensure all child content respects container width */
+.container * {
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .header {
@@ -49,6 +57,13 @@
     grid-template-columns: repeat(3, 1fr);
     gap: var(--space-md);
     margin-bottom: var(--space-lg);
+}
+
+/* Mobile: Single column for stats on small screens */
+@media (max-width: 480px) {
+    .statsGrid {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* Search Section */
@@ -204,23 +219,29 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: var(--space-sm);
 }
 
 .amountLabel,
 .dueLabel {
     color: var(--text-gray);
     font-size: var(--text-sm);
+    flex-shrink: 0;
 }
 
 .amountValue {
     font-size: var(--text-xl);
     font-weight: 700;
     color: var(--accent-teal);
+    text-align: right;
+    word-break: break-word;
 }
 
 .dueValue {
     font-weight: 600;
     color: var(--text-dark);
+    text-align: right;
+    word-break: break-word;
 }
 
 .billActions {
@@ -228,6 +249,17 @@
     gap: var(--space-sm);
     margin-top: var(--space-md);
     flex-wrap: wrap;
+}
+
+/* Mobile: Full-width buttons */
+@media (max-width: 480px) {
+    .billActions {
+        flex-direction: column;
+    }
+
+    .billActions button {
+        width: 100%;
+    }
 }
 
 .viewBtn,
@@ -422,6 +454,60 @@
     max-width: 500px;
     max-height: 90vh;
     overflow-y: auto;
+}
+
+.modalContentSimulator {
+    background: var(--white);
+    border-radius: var(--radius-xl);
+    width: 100%;
+    max-width: 700px;
+    max-height: 90vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+}
+
+.paymentInfo {
+    padding: var(--space-xl);
+    background: var(--bg-light);
+    border-bottom: 2px solid var(--border-light);
+}
+
+.infoTitle {
+    font-size: var(--text-xl);
+    font-weight: var(--font-bold);
+    color: var(--text-dark);
+    margin: 0 0 var(--space-md) 0;
+}
+
+.infoGrid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.infoRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-xs) 0;
+}
+
+.infoRow:not(:last-child) {
+    border-bottom: 1px solid var(--border-light);
+}
+
+.infoLabel {
+    font-size: var(--text-sm);
+    color: var(--text-gray);
+    font-weight: var(--font-medium);
+}
+
+.infoValue {
+    font-size: var(--text-sm);
+    color: var(--text-dark);
+    font-weight: var(--font-semibold);
 }
 
 .modalHeader {

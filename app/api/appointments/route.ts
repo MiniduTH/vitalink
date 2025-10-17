@@ -18,19 +18,19 @@ export async function GET(request: NextRequest) {
 
         if (patientId) {
             const appointments = await appointmentService.getPatientAppointments(patientId);
-            return NextResponse.json({ success: true, data: appointments });
+            return NextResponse.json({ success: true, appointments });
         }
 
         if (doctorId) {
             const appointments = await appointmentService.getDoctorAppointments(doctorId);
-            return NextResponse.json({ success: true, data: appointments });
+            return NextResponse.json({ success: true, appointments });
         }
 
         const appointments = await appointmentRepo.findAll({
             status: status || undefined,
             limit: limit ? parseInt(limit) : undefined,
         });
-        return NextResponse.json({ success: true, data: appointments });
+        return NextResponse.json({ success: true, appointments });
     } catch (error: any) {
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
