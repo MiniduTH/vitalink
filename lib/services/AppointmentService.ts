@@ -156,9 +156,21 @@ export class AppointmentService {
         }
 
         // Check if appointment is in the past
-        const now = Timestamp.now();
-        if (data.appointmentDate.seconds < now.seconds) {
+        const now = new Date();
+        const appointmentDate = data.appointmentDate.toDate();
+        const appointmentDateOnly = new Date(appointmentDate.getFullYear(), appointmentDate.getMonth(), appointmentDate.getDate());
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        if (appointmentDateOnly < today) {
             throw new ValidationError("Cannot book appointments in the past");
+        } else if (appointmentDateOnly.getTime() === today.getTime()) {
+            // For today, check if the time slot is in the future
+            const [hour, minute] = data.timeSlot.split(':').map(Number);
+            const appointmentTime = new Date(appointmentDateOnly);
+            appointmentTime.setHours(hour, minute);
+            if (appointmentTime <= now) {
+            throw new ValidationError("Cannot book appointments in the past");
+            }
         }
     }
 }
