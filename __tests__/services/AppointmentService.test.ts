@@ -21,7 +21,7 @@ describe("AppointmentService", () => {
         patientId: "patient123",
         doctorId: "doctor456",
         departmentId: "dept789",
-        appointmentDate: Timestamp.fromDate(new Date("2025-10-20T10:00:00")),
+        appointmentDate: Timestamp.fromDate(new Date("2025-12-20T10:00:00")),
         timeSlot: "10:00",
         reason: "Annual checkup",
         notes: "Patient requested morning slot",
@@ -33,7 +33,7 @@ describe("AppointmentService", () => {
         patientId: "patient123",
         doctorId: "doctor456",
         departmentId: "dept789",
-        appointmentDate: Timestamp.fromDate(new Date("2025-10-20T10:00:00")),
+        appointmentDate: Timestamp.fromDate(new Date("2025-12-20T10:00:00")),
         timeSlot: "10:00",
         reason: "Annual checkup",
         notes: "Patient requested morning slot",
@@ -209,7 +209,7 @@ describe("AppointmentService", () => {
         it("should return all slots when none are booked", async () => {
             mockAppointmentRepo.findByDoctorId.mockResolvedValue([]);
 
-            const slots = await appointmentService.getAvailableSlots("doctor456", Timestamp.fromDate(new Date("2025-10-20")));
+            const slots = await appointmentService.getAvailableSlots("doctor456", Timestamp.fromDate(new Date("2025-12-20")));
 
             expect(slots.length).toBeGreaterThan(0);
             expect(slots).toContain("09:00");
@@ -219,7 +219,7 @@ describe("AppointmentService", () => {
             const bookedAppointments = [{ ...mockAppointment, timeSlot: "10:00", status: "Scheduled" as const }];
             mockAppointmentRepo.findByDoctorId.mockResolvedValue(bookedAppointments);
 
-            const slots = await appointmentService.getAvailableSlots("doctor456", Timestamp.fromDate(new Date("2025-10-20")));
+            const slots = await appointmentService.getAvailableSlots("doctor456", Timestamp.fromDate(new Date("2025-12-20")));
 
             expect(slots).not.toContain("10:00");
             expect(slots).toContain("09:00");

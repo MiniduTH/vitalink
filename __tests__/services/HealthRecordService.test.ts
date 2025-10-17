@@ -32,6 +32,7 @@ describe("HealthRecordService", () => {
         digitalHealthCardId: "card123",
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
+        medications: []
     };
 
     beforeEach(() => {
