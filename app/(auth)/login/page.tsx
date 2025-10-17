@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "@/lib/firebase/config";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+import { useRouter, useSearchParams } from "next/navigation";
+import React, { Suspense, useEffect, useState } from "react";
 import styles from "./login.module.css";
 
-export default function LoginPage() {
+// Separate component for handling search params
+function LoginForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [formData, setFormData] = useState({
@@ -246,5 +247,23 @@ export default function LoginPage() {
                 </p>
             </div>
         </div>
+    );
+}
+
+// Main page component with Suspense boundary
+export default function LoginPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className={styles.container}>
+                    <div className={styles.header}>
+                        <h1 className={styles.title}>Welcome Back</h1>
+                        <p className={styles.subtitle}>Loading...</p>
+                    </div>
+                </div>
+            }
+        >
+            <LoginForm />
+        </Suspense>
     );
 }
