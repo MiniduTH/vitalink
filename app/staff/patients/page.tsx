@@ -86,7 +86,7 @@ export default function PatientsPage() {
     };
 
     const handleNewPatient = () => {
-        router.push("/patients/new");
+        router.push("/staff/patients/new");
     };
 
     return (

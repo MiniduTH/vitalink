@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
-import { Timestamp } from "firebase/firestore";
 
 export default function NewPatientPage() {
     const router = useRouter();
@@ -43,9 +42,20 @@ export default function NewPatientPage() {
             return;
         }
 
-        if (!formData.contactNumber || formData.contactNumber.length < 10) {
-            setError("Valid contact number is required (min 10 digits)");
+        // Validate contact number (must be exactly 10 digits)
+        const cleanedPhone = formData.contactNumber.replace(/[-\s]/g, "");
+        if (!formData.contactNumber || !/^[0-9]{10}$/.test(cleanedPhone)) {
+            setError("Contact number must be exactly 10 digits");
             return;
+        }
+
+        // Validate emergency contact phone if provided
+        if (formData.emergencyContactPhone) {
+            const cleanedEmergencyPhone = formData.emergencyContactPhone.replace(/[-\s]/g, "");
+            if (!/^[0-9]{10}$/.test(cleanedEmergencyPhone)) {
+                setError("Emergency contact phone must be exactly 10 digits (or leave empty)");
+                return;
+            }
         }
 
         if (!formData.dateOfBirth) {
@@ -56,12 +66,13 @@ export default function NewPatientPage() {
         try {
             setLoading(true);
 
+            // Send ISO string date - API will convert to Timestamp
             const payload = {
                 firstName: formData.firstName.trim(),
                 lastName: formData.lastName.trim(),
                 email: formData.email.trim(),
                 contactNumber: formData.contactNumber.trim(),
-                dateOfBirth: Timestamp.fromDate(new Date(formData.dateOfBirth)),
+                dateOfBirth: formData.dateOfBirth, // ISO string
                 gender: formData.gender,
                 address: formData.address.trim(),
                 emergencyContact: {
@@ -71,6 +82,8 @@ export default function NewPatientPage() {
                 },
             };
 
+            console.log("Sending payload:", payload); // Debug log
+
             const response = await fetch("/api/patients", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -78,21 +91,23 @@ export default function NewPatientPage() {
             });
 
             const data = await response.json();
+            console.log("API Response:", data); // Debug log
 
             if (!response.ok || !data.success) {
                 throw new Error(data.error || "Failed to register patient");
             }
 
-            // Success - redirect to patient detail page
-            router.push(`/patients/${data.data.id}`);
+            // Success - redirect back to patients list
+            router.push("/staff/patients");
         } catch (err) {
+            console.error("Registration error:", err); // Debug log
             setError(err instanceof Error ? err.message : "Failed to register patient");
             setLoading(false);
         }
     };
 
     const handleCancel = () => {
-        router.push("/patients");
+        router.push("/staff/patients");
     };
 
     return (
@@ -172,8 +187,12 @@ export default function NewPatientPage() {
                                 value={formData.contactNumber}
                                 onChange={handleChange}
                                 placeholder="0771234567"
+                                pattern="[0-9]{10}"
+                                title="Must be exactly 10 digits"
+                                maxLength={10}
                                 required
                             />
+                            <small style={{ fontSize: "12px", color: "var(--text-gray)" }}>Must be exactly 10 digits</small>
                         </div>
                     </div>
 
@@ -258,7 +277,12 @@ export default function NewPatientPage() {
                                 className={styles.input}
                                 value={formData.emergencyContactPhone}
                                 onChange={handleChange}
+                                placeholder="0779876543"
+                                pattern="[0-9]{10}"
+                                title="Must be exactly 10 digits (if provided)"
+                                maxLength={10}
                             />
+                            <small style={{ fontSize: "12px", color: "var(--text-gray)" }}>Optional - 10 digits if provided</small>
                         </div>
                     </div>
                 </div>
